@@ -1,0 +1,40 @@
+# Bilibili Bangumi Analysis - dependencies, Python 3.8+
+
+# Web
+Flask>=2.3.0
+Flask-CORS>=4.0.0
+Flask-Login>=0.6.3
+
+# Bilibili API
+bilibili-api-python>=17.4.0
+aiohttp>=3.8.0
+
+# Database
+PyMySQL>=1.1.0
+cryptography>=42.0.0
+SQLAlchemy>=2.0.0
+Flask-SQLAlchemy>=3.0.0
+
+# Cache (optional)
+redis>=4.5.0
+
+# Data
+pandas>=2.0.0
+numpy>=1.24.0
+
+# HTTP & parse
+requests>=2.31.0
+qrcode[pil]>=7.4.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+
+# Auth
+Werkzeug>=2.3.0
+
+# Config
+python-dotenv>=1.0.0
+
+# Charts (optional)
+pyecharts>=2.0.0
+matplotlib>=3.7.0
+seaborn>=0.12.0

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>登录 - B站动漫番剧数据分析与可视化系统</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1f2937; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .gate-content { max-width: 360px; width: 100%; padding: 28px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+    .gate-content h2 { margin-bottom: 16px; text-align: center; font-size: 1.15rem; color: #111827; }
+    .gate-content p { color: #1f2937; font-size: 14px; margin-bottom: 16px; text-align: center; }
+    .gate-qr-btn { width: 100%; padding: 12px; background: #0284c7; color: #fff; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    .gate-qr-btn:hover { background: #0369a1; }
+    .user-form input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; color: #1f2937; }
+    .user-form button { width: 100%; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+    .error { color: #dc2626; margin-top: 8px; }
+    .hidden { display: none; }
+    a { color: #0369a1; }
+    .gate-qr-panel { margin-top: 16px; padding: 16px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="gate-content">
+    <h2>B站动漫番剧数据分析与可视化系统</h2>
+    <p>使用 B 站扫码登录</p>
+    <button id="gate-btn-show-qr" type="button" class="gate-qr-btn">显示登录二维码</button>
+    <div id="gate-qr-wrap" class="hidden gate-qr-panel">
+      <img id="gate-qr-img" alt="登录二维码" style="width:200px;height:200px;display:block;margin:0 auto">
+      <p id="gate-qr-status" style="font-size:12px;color:#0369a1;margin-top:12px">请使用 B 站 App 扫描二维码</p>
+    </div>
+  </div>
+  <script src="login.js"></script>
+</body>
+</html>
