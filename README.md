@@ -2,9 +2,6 @@
 
 基于任务书要求，使用 Python + Flask + MySQL + bilibili-api-python 实现的番剧数据采集、存储、分析与可视化系统。
 
-> 👤 作者：[@Sixlool](https://github.com/Sixlool)
-> 📦 相关项目：[dsh-desktop-pet（桌宠）](https://github.com/Sixlool/dsh-desktop-pet) · [dsh-skill-picker（Skill 选择器）](https://github.com/Sixlool/dsh-skill-picker) · [dsh-interactive-dev-skill（AI 开发方法论 Skill）](https://github.com/Sixlool/dsh-interactive-dev-skill)
-
 ## 环境要求
 
 - Python 3.8+
