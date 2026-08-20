@@ -1233,32 +1233,6 @@ function pollCrawlStatus(msgEl, targets) {
   }, 2000);
 }
 
-document.getElementById("btn-crawl-start").addEventListener("click", () => {
-  const year = document.getElementById("crawl-year").value || null;
-  const season = document.getElementById("crawl-season").value || null;
-  const pages = parseInt(document.getElementById("crawl-pages").value, 10) || 2;
-  const delay = parseFloat(document.getElementById("crawl-delay").value) || 3;
-  const msg = document.getElementById("crawl-msg");
-  const wrap = document.getElementById("crawl-progress");
-  const bar = document.getElementById("crawl-progress-bar");
-  wrap.style.display = "block";
-  bar.classList.add("indeterminate");
-  msg.textContent = "正在启动采集…";
-  fetch(`${API_BASE}/crawl/start`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ year: year || null, season: season ? parseInt(season, 10) : null, pages, delay }),
-  })
-    .then(r => r.json())
-    .then(res => {
-      msg.textContent = res.message || "已提交";
-      if (res.using_bilibili_cookie) msg.textContent += "（使用 B 站 Cookie）";
-      pollCrawlStatus(msg, { wrap: "crawl-progress", bar: "crawl-progress-bar", msg: "crawl-msg" });
-    })
-    .catch(() => { msg.textContent = "请求失败"; });
-});
-
 document.getElementById("btn-save-bili-cookie").addEventListener("click", () => {
   const sessdata = document.getElementById("bili-sessdata").value.trim();
   const bili_jct = document.getElementById("bili-bili-jct").value.trim();
@@ -1961,13 +1935,8 @@ function loadAdminPage() {
   }
   loadAdminOverview();
   loadAdminUsers();
-  fetch(`/api/user/bilibili-cookie`, { credentials: "include" })
-    .then(r => r.json())
-    .then(res => {
-      const el = document.getElementById("admin-bili-cookie-status");
-      if (el) el.textContent = res.has_cookie ? "已设置 B 站 Cookie（采集时带登录态）" : "未设置 B 站 Cookie（采集为游客态，更易触发风控）";
-    })
-    .catch(() => {});
+  // 后台 Cookie 管理：显示当前状态（同个人中心的绑定状态检查复用）
+  loadBilibiliCookieStatus();
 }
 
 document.addEventListener("DOMContentLoaded", () => {

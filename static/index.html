@@ -358,75 +358,10 @@
         <div id="tag-recommend-list" class="card-list"></div>
         <p id="tag-recommend-msg" class="muted" style="font-size:12px;margin-top:8px;min-height:1.2em"></p>
         <hr class="hr-light" style="margin:24px 0">
-        <h3 style="margin-bottom:12px;color:#111827">爬取数据</h3>
-        <p class="muted" style="font-size:12px;margin-bottom:12px">索引与详情请求均会使用您已保存的 B 站 Cookie（若已设置），以登录态请求可降低 412。若仍易触发风控，请调大「间隔」或减少「页数」。</p>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
-          <select id="crawl-year" style="width:110px" title="按 B 站年份分桶筛选，不选则不限">
-            <option value="">年份</option>
-            <option value="2026">2026</option>
-            <option value="2025">2025</option>
-            <option value="2024">2024</option>
-            <option value="2023">2023</option>
-            <option value="2022">2022</option>
-            <option value="2021">2021</option>
-            <option value="2020">2020</option>
-            <option value="2019">2019</option>
-            <option value="2018">2018</option>
-            <option value="2017">2017</option>
-            <option value="2016">2016</option>
-            <option value="2015">2015</option>
-            <option value="2014-2010">2014-2010</option>
-            <option value="2009-2005">2009-2005</option>
-            <option value="2004-2000">2004-2000</option>
-            <option value="90年代">90年代</option>
-            <option value="80年代">80年代</option>
-            <option value="更早">更早</option>
-          </select>
-          <select id="crawl-season" style="width:80px" title="冬1/春4/夏7/秋10，不选则不限">
-            <option value="">季度</option>
-            <option value="1">冬</option>
-            <option value="4">春</option>
-            <option value="7">夏</option>
-            <option value="10">秋</option>
-          </select>
-          <label class="muted" style="display:inline-flex;align-items:center;gap:4px;font-size:12px">
-            <span>页数</span>
-            <input type="number" id="crawl-pages" value="2" min="1" max="10" style="width:50px" title="要拉取的索引页数，越大条数越多、越易触发风控">
-          </label>
-          <label class="muted" style="display:inline-flex;align-items:center;gap:4px;font-size:12px">
-            <span>间隔(秒)</span>
-            <input type="number" id="crawl-delay" value="3" min="2" max="10" step="0.5" style="width:56px" title="每两次请求之间的等待秒数，越大越不易 412">
-          </label>
-          <button id="btn-crawl-start">开始采集</button>
-        </div>
-        <p class="muted" style="font-size:11px;margin-bottom:8px">页数：拉取多少页列表（每页约 20 条）；间隔：每次请求间隔秒数，建议 3～5。采集完成后请点击顶部「番剧列表」查看；若进度显示共 0 条多为触发风控，可调大间隔或减少页数后重试。</p>
-        <div id="crawl-progress" class="crawl-progress-wrap">
-          <div class="crawl-progress-track"><div id="crawl-progress-bar" class="crawl-progress-bar"></div></div>
-          <div class="crawl-progress-text" id="crawl-msg"></div>
-        </div>
-        <hr class="hr-light" style="margin:24px 0">
         <h3 style="margin-bottom:12px;color:#111827">B站账号绑定</h3>
         <div id="bili-bind-status" style="font-size:12px;margin-bottom:10px;min-height:1.4em"></div>
         <p class="muted" style="font-size:12px;margin-bottom:8px">绑定 B 站账号后，可用该 B 站账号扫码直接登录本系统（无需再输账号密码）。</p>
         <button id="btn-bili-bind-show" type="button" style="margin-bottom:16px">扫码绑定 B 站账号</button>
-        <hr class="hr-light" style="margin:0 0 24px 0">
-        <h3 style="margin-bottom:12px;color:#111827">B站 Cookie（可选）</h3>
-        <p class="muted" style="font-size:12px;margin-bottom:8px">用于采集时带登录态，降低 412 风控。可手动粘贴 Cookie，或使用下方扫码登录。</p>
-        <input type="text" id="bili-sessdata" placeholder="sessdata" style="margin-bottom:8px">
-        <input type="text" id="bili-bili-jct" placeholder="bili_jct" style="margin-bottom:8px">
-        <button id="btn-save-bili-cookie">保存 Cookie</button>
-        <span id="bili-cookie-status" class="muted" style="margin-left:8px;font-size:12px"></span>
-        <p class="muted" style="margin-top:12px;font-size:12px">或使用 B 站扫码登录（无需记住密码）：</p>
-        <button id="btn-bili-qr-show" type="button" style="margin-top:8px">显示登录二维码</button>
-        <div id="bili-qr-modal" class="bili-qr-modal hidden" role="dialog" aria-modal="true" aria-labelledby="bili-qr-modal-title">
-          <div class="bili-qr-modal-backdrop" id="bili-qr-modal-backdrop" title="点击关闭"></div>
-          <div class="bili-qr-modal-card panel-soft" id="bili-qr-card">
-            <p id="bili-qr-modal-title" class="muted" style="font-size:12px;margin-bottom:12px">请使用 B 站 App 或网页扫描下方二维码登录</p>
-            <img id="bili-qr-img" alt="登录二维码" style="display:block;width:200px;height:200px">
-            <p id="bili-qr-status" style="font-size:12px;color:#0369a1;margin-top:12px">等待扫码...</p>
-            <button id="btn-bili-qr-close" type="button" style="margin-top:14px;padding:6px 16px">关闭</button>
-          </div>
-        </div>
       </div>
     </section>
 
@@ -493,10 +428,24 @@
       </div>
 
       <div class="panel-soft" style="padding:18px;margin-bottom:16px">
-        <h3 style="margin-bottom:12px;color:#111827">B 站 Cookie（管理员全局）</h3>
-        <p class="muted" style="font-size:12px;margin-bottom:8px">采集时使用管理员账号的 Cookie 降低风控。可在「个人中心」扫码登录或手动粘贴，本页仅显示状态。</p>
-        <span id="admin-bili-cookie-status" class="muted" style="font-size:12px"></span>
-        <a href="#" data-page="user" style="margin-left:10px;font-size:12px">去个人中心设置 →</a>
+        <h3 style="margin-bottom:12px;color:#111827">B站 Cookie（管理员）</h3>
+        <p class="muted" style="font-size:12px;margin-bottom:8px">采集时使用管理员账号的 Cookie 以登录态请求，降低 412 风控。可手动粘贴，或扫码登录自动获取。</p>
+        <input type="text" id="bili-sessdata" placeholder="sessdata" style="width:100%;margin-bottom:8px">
+        <input type="text" id="bili-bili-jct" placeholder="bili_jct" style="width:100%;margin-bottom:8px">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <button id="btn-save-bili-cookie">保存 Cookie</button>
+          <button id="btn-bili-qr-show" type="button">显示登录二维码</button>
+          <span id="bili-cookie-status" class="muted" style="font-size:12px"></span>
+        </div>
+        <div id="bili-qr-modal" class="bili-qr-modal hidden" role="dialog" aria-modal="true" aria-labelledby="bili-qr-modal-title">
+          <div class="bili-qr-modal-backdrop" id="bili-qr-modal-backdrop" title="点击关闭"></div>
+          <div class="bili-qr-modal-card panel-soft" id="bili-qr-card">
+            <p id="bili-qr-modal-title" class="muted" style="font-size:12px;margin-bottom:12px">请使用 B 站 App 或网页扫描下方二维码登录</p>
+            <img id="bili-qr-img" alt="登录二维码" style="display:block;width:200px;height:200px">
+            <p id="bili-qr-status" style="font-size:12px;color:#0369a1;margin-top:12px">等待扫码...</p>
+            <button id="btn-bili-qr-close" type="button" style="margin-top:14px;padding:6px 16px">关闭</button>
+          </div>
+        </div>
       </div>
 
       <div class="panel-soft" style="padding:18px">
