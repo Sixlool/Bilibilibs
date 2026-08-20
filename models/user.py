@@ -52,3 +52,22 @@ class CrawlStatus(db.Model):
     items = db.Column(db.Integer, default=0)
     message = db.Column(db.String(512), default="")
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class VisitStat(db.Model):
+    """每日访问统计"""
+    __tablename__ = "visit_stat"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    stat_date = db.Column(db.Date, nullable=False, unique=True, index=True)
+    pv = db.Column(db.Integer, default=0, nullable=False)
+    uv = db.Column(db.Integer, default=0, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class VisitUv(db.Model):
+    """独立访客去重（每日每 IP 一条）"""
+    __tablename__ = "visit_uv"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    stat_date = db.Column(db.Date, nullable=False, index=True)
+    ip = db.Column(db.String(64), nullable=False, default="")
+    __table_args__ = (db.UniqueConstraint("stat_date", "ip", name="uk_date_ip"),)

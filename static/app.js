@@ -1821,8 +1821,52 @@ function loadAdminPage() {
   }
   loadAdminOverview();
   loadAdminUsers();
+  loadAdminVisits();
   // 后台 Cookie 管理：显示当前状态（同个人中心的绑定状态检查复用）
   loadBilibiliCookieStatus();
+}
+
+let adminVisitChart = null;
+
+function loadAdminVisits() {
+  const summaryEl = document.getElementById("admin-visit-summary");
+  const chartEl = document.getElementById("admin-visit-chart");
+  if (!summaryEl || !chartEl) return;
+  fetch(`/admin/stats/visits?days=14`, { credentials: "include" })
+    .then(r => r.json())
+    .then(res => {
+      if (!res.ok) { summaryEl.innerHTML = `<span style="color:#dc2626">加载失败：${escapeHtml(res.error || "")}</span>`; return; }
+      // 今日汇总卡片
+      const t = res.today;
+      summaryEl.innerHTML = `
+        <span style="background:#f1f5f9;border-radius:6px;padding:8px 14px"><b>今日访问</b><br><span style="font-size:18px">${t.pv}</span> 次</span>
+        <span style="background:#f1f5f9;border-radius:6px;padding:8px 14px"><b>今日访客</b><br><span style="font-size:18px">${t.uv}</span> 人</span>
+        <span style="background:#f1f5f9;border-radius:6px;padding:8px 14px"><b>近 ${res.days} 天总访问</b><br><span style="font-size:18px">${res.total.pv}</span> 次</span>
+        <span style="background:#f1f5f9;border-radius:6px;padding:8px 14px"><b>近 ${res.days} 天总访客</b><br><span style="font-size:18px">${res.total.uv}</span> 人</span>
+      `;
+      // 折线图
+      const dates = res.series.map(s => s.date.slice(5));
+      const pv = res.series.map(s => s.pv);
+      const uv = res.series.map(s => s.uv);
+      if (typeof echarts === "undefined") {
+        chartEl.innerHTML = "<p style='color:#6b7280;font-size:12px'>图表库未加载</p>";
+        return;
+      }
+      if (adminVisitChart) { adminVisitChart.dispose(); adminVisitChart = null; }
+      adminVisitChart = echarts.init(chartEl);
+      adminVisitChart.setOption({
+        tooltip: { trigger: "axis" },
+        legend: { data: ["访问量 (PV)", "访客数 (UV)"] },
+        grid: { left: 40, right: 20, top: 40, bottom: 30 },
+        xAxis: { type: "category", data: dates },
+        yAxis: { type: "value", minInterval: 1 },
+        series: [
+          { name: "访问量 (PV)", type: "line", smooth: true, data: pv, itemStyle: { color: "#0284c7" }, areaStyle: { opacity: 0.1 } },
+          { name: "访客数 (UV)", type: "line", smooth: true, data: uv, itemStyle: { color: "#16a34a" } },
+        ],
+      });
+    })
+    .catch(() => { summaryEl.innerHTML = "<span style='color:#dc2626'>加载失败</span>"; });
 }
 
 document.addEventListener("DOMContentLoaded", () => {

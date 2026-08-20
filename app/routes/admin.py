@@ -80,6 +80,51 @@ def overview():
     })
 
 
+@admin_bp.route("/stats/visits", methods=["GET"])
+@admin_required
+def stats_visits():
+    """访问统计：最近 N 天每日 PV/UV（折线图数据）+ 今日汇总"""
+    from datetime import date, timedelta
+    from models.user import VisitStat
+    days = min(max(int(request.args.get("days") or 14), 1), 90)
+    today = date.today()
+    start = today - timedelta(days=days - 1)
+
+    rows = (VisitStat.query
+            .filter(VisitStat.stat_date >= start, VisitStat.stat_date <= today)
+            .order_by(VisitStat.stat_date.asc())
+            .all())
+    by_date = {r.stat_date: r for r in rows}
+
+    series = []
+    total_pv = 0
+    total_uv = 0
+    for i in range(days):
+        d = start + timedelta(days=i)
+        r = by_date.get(d)
+        pv = r.pv if r else 0
+        uv = r.uv if r else 0
+        total_pv += pv
+        total_uv += uv
+        series.append({
+            "date": d.isoformat(),
+            "pv": pv,
+            "uv": uv,
+        })
+
+    today_rec = by_date.get(today)
+    return jsonify({
+        "ok": True,
+        "days": days,
+        "today": {
+            "pv": today_rec.pv if today_rec else 0,
+            "uv": today_rec.uv if today_rec else 0,
+        },
+        "total": {"pv": total_pv, "uv": total_uv},
+        "series": series,
+    })
+
+
 @admin_bp.route("/crawl/status", methods=["GET"])
 @admin_required
 def crawl_status():

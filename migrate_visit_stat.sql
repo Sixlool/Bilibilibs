@@ -1,0 +1,17 @@
+-- 网站访问统计表（每日 PV/UV）
+CREATE TABLE IF NOT EXISTS visit_stat (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    stat_date DATE NOT NULL COMMENT '统计日期',
+    pv INT NOT NULL DEFAULT 0 COMMENT '页面访问量',
+    uv INT NOT NULL DEFAULT 0 COMMENT '独立访客数（按 IP 去重）',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_date (stat_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='访问统计';
+
+-- 独立访客去重表（每日每 IP 仅计一次 UV）
+CREATE TABLE IF NOT EXISTS visit_uv (
+    id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    stat_date DATE NOT NULL,
+    ip VARCHAR(64) NOT NULL DEFAULT '',
+    UNIQUE KEY uk_date_ip (stat_date, ip)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='独立访客去重';
