@@ -235,111 +235,7 @@ function applyDashboardLinkToList(opts) {
   loadList();
 }
 
-document.getElementById("btn-refresh-all-in-db").addEventListener("click", () => {
-  if (!confirm("将按顺序重新拉取数据库中已有番剧的详情（简介、播放量、分集等）。条目越多耗时越长，且勿与个人中心其它采集同时进行。确定开始？")) return;
-  const msg = document.getElementById("list-crawl-msg");
-  const wrap = document.getElementById("list-crawl-progress");
-  const bar = document.getElementById("list-crawl-progress-bar");
-  const btn = document.getElementById("btn-refresh-all-in-db");
-  wrap.style.display = "block";
-  bar.classList.add("indeterminate");
-  msg.textContent = "正在提交…";
-  btn.disabled = true;
-  fetch(`${API_BASE}/crawl/refresh-in-db`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ delay: 4 }),
-  })
-    .then((r) => r.json().then((j) => ({ ok: r.ok, status: r.status, body: j })))
-    .then(({ ok, status, body }) => {
-      if (status === 409 || !ok) {
-        btn.disabled = false;
-        wrap.style.display = "none";
-        msg.textContent = body.error || body.message || "请求失败";
-        return;
-      }
-      window.__listBulkRefreshPending = true;
-      bar.classList.remove("indeterminate");
-      msg.textContent = (body.message || "已开始") + (body.using_bilibili_cookie ? "（已使用 B 站 Cookie）" : "（未检测到 Cookie，若频繁失败请先在个人中心扫码登录）");
-      pollCrawlStatus(null, { wrap: "list-crawl-progress", bar: "list-crawl-progress-bar", msg: "list-crawl-msg" });
-    })
-    .catch(() => {
-      btn.disabled = false;
-      msg.textContent = "网络错误，请稍后重试";
-    });
-});
-
 // ---------- 番剧详情 ----------
-function triggerRefreshBangumiDetail(mediaId, btn) {
-  if (!btn || btn.disabled) return;
-  const prevText = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "拉取中…";
-  fetch(`${API_BASE}/crawl/refresh-detail`, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ media_id: mediaId }),
-  })
-    .then((r) => r.json().then((j) => ({ ok: r.ok, status: r.status, body: j })))
-    .then(({ ok, status, body }) => {
-      if (!ok) throw new Error(body.error || body.message || "请求失败");
-      const t0 = Date.now();
-      let seenRunning = false;
-      function finishOk() {
-        btn.disabled = false;
-        btn.textContent = prevText;
-        openDetail(mediaId);
-      }
-      function finishErr(msg) {
-        btn.disabled = false;
-        btn.textContent = prevText;
-        alert(msg || "更新失败");
-      }
-      function poll() {
-        fetch(`${API_BASE}/crawl/status`, { credentials: "include" })
-          .then((r) => r.json())
-          .then((res) => {
-            if (res.running && res.job === "detail" && res.detail_media_id === mediaId) seenRunning = true;
-            const msg = res.message || "";
-            if (!res.running && seenRunning) {
-              if (msg.indexOf("详情已更新") !== -1) finishOk();
-              else finishErr(msg);
-              return;
-            }
-            const elapsed = Date.now() - t0;
-            if (!res.running && !seenRunning && elapsed > 600) {
-              if (msg.indexOf("详情已更新") !== -1) {
-                finishOk();
-                return;
-              }
-              if (
-                msg.indexOf("拉取失败") !== -1 ||
-                msg.indexOf("写入失败") !== -1 ||
-                msg.indexOf("未找到") !== -1
-              ) {
-                finishErr(msg);
-                return;
-              }
-            }
-            if (elapsed > 120000) {
-              finishErr("等待超时，请在个人中心查看采集进度或稍后手动刷新本页");
-              return;
-            }
-            setTimeout(poll, 450);
-          })
-          .catch((err) => finishErr(err.message || "网络错误"));
-      }
-      setTimeout(poll, 200);
-    })
-    .catch((err) => {
-      btn.disabled = false;
-      btn.textContent = prevText;
-      alert(err.message || "请求失败");
-    });
-}
-
 function openDetail(mediaId) {
   showPage("detail");
   const content = document.getElementById("detail-content");
@@ -359,7 +255,6 @@ function openDetail(mediaId) {
           <img src="${normalizeCoverUrl(d.cover) || ''}" alt="${escapeHtml(d.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 fill=%22%23374151%22 text-anchor=%22middle%22>无图</text></svg>'">
           <div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center">
             ${window.currentUser ? `<button id="btn-fav" style="padding:8px 16px;cursor:pointer;background:${d.favorited ? '#e5e7eb' : '#0284c7'};color:${d.favorited ? '#1f2937' : '#fff'};border:none;border-radius:6px">${d.favorited ? '已收藏' : '收藏'}</button>` : ""}
-            ${window.currentUser ? `<button type="button" id="btn-refresh-detail" style="padding:8px 16px;cursor:pointer;background:#0284c7;color:#fff;border:none;border-radius:6px;font-size:14px">重新爬取详情</button>` : ""}
             ${biliUrl ? `<a href="${biliUrl}" target="_blank" rel="noopener noreferrer" style="padding:8px 16px;background:#0284c7;color:#fff;border-radius:6px;text-decoration:none;font-size:14px">在 B 站打开</a>` : ""}
           </div>
         </div>
@@ -392,10 +287,6 @@ function openDetail(mediaId) {
           const favorited = btnFav.dataset.favorited === "true";
           toggleFavorite(mediaId, favorited, btnFav);
         });
-      }
-      const btnRefresh = document.getElementById("btn-refresh-detail");
-      if (btnRefresh) {
-        btnRefresh.addEventListener("click", () => triggerRefreshBangumiDetail(mediaId, btnRefresh));
       }
     })
     .catch(err => { content.innerHTML = "<p class='error'>" + escapeHtml(err.message) + "</p>"; });
@@ -1152,8 +1043,6 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 let crawlStatusTimer = null;
-/** 列表页「更新库内番剧信息」提交成功后置 true，进度结束时用于恢复按钮 */
-window.__listBulkRefreshPending = false;
 function stopCrawlStatusPoll() {
   if (crawlStatusTimer) { clearInterval(crawlStatusTimer); crawlStatusTimer = null; }
 }
@@ -1197,7 +1086,7 @@ function renderCrawlProgress(res, targets) {
 
 function pollCrawlStatus(msgEl, targets) {
   stopCrawlStatusPoll();
-  const t = targets || { wrap: "list-crawl-progress", bar: "list-crawl-progress-bar", msg: "list-crawl-msg" };
+  const t = targets || null;
   crawlStatusTimer = setInterval(() => {
     fetch(`${API_BASE}/crawl/status`, { credentials: "include" })
       .then(r => r.json())
@@ -1208,10 +1097,12 @@ function pollCrawlStatus(msgEl, targets) {
         } else {
           // 完成态：构建「去番剧列表」链接（仅列表页用）
           const link = res.items > 0 ? ' <a href="#" id="crawl-goto-list" style="color:#0369a1;margin-left:6px">去番剧列表</a>' : "";
-          renderCrawlProgress({ ...res, job: res.job || "done" }, {
-            ...t,
-            extraLink: link,
-          });
+          if (t) {
+            renderCrawlProgress({ ...res, job: res.job || "done" }, {
+              ...t,
+              extraLink: link,
+            });
+          }
           const el = document.getElementById("crawl-goto-list");
           if (el) el.addEventListener("click", function(e) {
             e.preventDefault();
@@ -1221,11 +1112,6 @@ function pollCrawlStatus(msgEl, targets) {
             loadList();
           });
           stopCrawlStatusPoll();
-          if (window.__listBulkRefreshPending) {
-            window.__listBulkRefreshPending = false;
-            const lb = document.getElementById("btn-refresh-all-in-db");
-            if (lb) lb.disabled = false;
-          }
           if (res.items > 0 && document.getElementById("page-home").classList.contains("active")) loadList();
         }
       })
