@@ -27,10 +27,18 @@ def register():
         password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
         email=email,
     )
+    # 首个管理员引导：若库中尚无任何管理员，且环境变量 ADMIN_USERNAME 与注册用户名一致，
+    # 则该用户自动成为管理员（部署时在 .env 设置 ADMIN_USERNAME 即可）。
+    import os
+    admin_username = (os.getenv("ADMIN_USERNAME") or "").strip()
+    if admin_username and username == admin_username:
+        admin_exists = User.query.filter(User.is_admin == True).first()  # noqa: E712
+        if not admin_exists:
+            user.is_admin = True
     db.session.add(user)
     db.session.commit()
     login_user(user)
-    return jsonify({"ok": True, "user": {"id": user.id, "username": user.username}})
+    return jsonify({"ok": True, "user": {"id": user.id, "username": user.username, "is_admin": bool(user.is_admin)}})  # noqa: E501
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -45,7 +53,7 @@ def login():
     if not user or not check_password_hash(user.password_hash, password):
         return jsonify({"ok": False, "error": "invalid username or password"}), 401
     login_user(user)
-    return jsonify({"ok": True, "user": {"id": user.id, "username": user.username}})
+    return jsonify({"ok": True, "user": {"id": user.id, "username": user.username, "is_admin": bool(user.is_admin)}})  # noqa: E501
 
 
 @auth_bp.route("/logout", methods=["POST"])
@@ -60,4 +68,8 @@ def me():
     """当前登录用户信息"""
     if not current_user.is_authenticated:
         return jsonify({"ok": True, "user": None})
-    return jsonify({"ok": True, "user": {"id": current_user.id, "username": current_user.username}})
+    return jsonify({"ok": True, "user": {
+        "id": current_user.id,
+        "username": current_user.username,
+        "is_admin": bool(getattr(current_user, "is_admin", False)),
+    }})

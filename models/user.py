@@ -18,6 +18,8 @@ class User(UserMixin, db.Model):
     # 可选：用户填写的 B 站 Cookie，采集时用该账号请求以降低 412 风控
     bilibili_sessdata = db.Column(db.String(512), default="")
     bilibili_bili_jct = db.Column(db.String(256), default="")
+    # 是否管理员（可进入后台管理界面，执行数据采集等管理操作）
+    is_admin = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

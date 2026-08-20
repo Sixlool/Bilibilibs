@@ -208,6 +208,7 @@
         <a href="#" data-page="home">番剧列表</a>
         <a href="#" data-page="dashboard">数据大屏</a>
         <a href="#" data-page="user" id="nav-user">个人中心</a>
+        <a href="#" data-page="admin" id="nav-admin" class="hidden">后台管理</a>
       </div>
       <span id="user-name" class="hidden"></span>
       <button id="btn-logout" type="button" class="hidden">退出</button>
@@ -395,6 +396,92 @@
             <button id="btn-bili-qr-close" type="button" style="margin-top:14px;padding:6px 16px">关闭</button>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- 后台管理（仅管理员可见） -->
+    <section id="page-admin" class="page">
+      <div class="panel-soft" style="padding:18px;margin-bottom:16px">
+        <h3 style="margin-bottom:12px;color:#111827">数据统计概览</h3>
+        <div id="admin-overview" style="display:flex;flex-wrap:wrap;gap:14px;font-size:13px">
+          <span>加载中…</span>
+        </div>
+      </div>
+
+      <div class="panel-soft" style="padding:18px;margin-bottom:16px">
+        <h3 style="margin-bottom:12px;color:#111827">数据采集</h3>
+        <p class="muted" style="font-size:12px;margin-bottom:12px">
+          采集操作已收口到后台，仅管理员可执行。使用管理员账号已保存的 B 站 Cookie（若有）以登录态请求，可降低 412 风控。
+          仍易触发风控时，请调大「间隔」或减少「页数」。
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px">
+          <select id="admin-crawl-year" style="width:110px" title="按 B 站年份分桶筛选，不选则不限">
+            <option value="">年份</option>
+            <option value="2026">2026</option>
+            <option value="2025">2025</option>
+            <option value="2024">2024</option>
+            <option value="2023">2023</option>
+            <option value="2022">2022</option>
+            <option value="2021">2021</option>
+            <option value="2020">2020</option>
+            <option value="2019">2019</option>
+            <option value="2018">2018</option>
+            <option value="2017">2017</option>
+            <option value="2016">2016</option>
+            <option value="2015">2015</option>
+            <option value="2014-2010">2014-2010</option>
+            <option value="2009-2005">2009-2005</option>
+            <option value="2004-2000">2004-2000</option>
+            <option value="90年代">90年代</option>
+            <option value="80年代">80年代</option>
+            <option value="更早">更早</option>
+          </select>
+          <select id="admin-crawl-season" style="width:80px" title="冬1/春4/夏7/秋10，不选则不限">
+            <option value="">季度</option>
+            <option value="1">冬</option>
+            <option value="4">春</option>
+            <option value="7">夏</option>
+            <option value="10">秋</option>
+          </select>
+          <label class="muted" style="display:inline-flex;align-items:center;gap:4px;font-size:12px">
+            <span>页数</span>
+            <input type="number" id="admin-crawl-pages" value="2" min="1" max="10" style="width:50px">
+          </label>
+          <label class="muted" style="display:inline-flex;align-items:center;gap:4px;font-size:12px">
+            <span>间隔(秒)</span>
+            <input type="number" id="admin-crawl-delay" value="3" min="2" max="10" step="0.5" style="width:56px">
+          </label>
+          <button id="admin-btn-crawl-start">开始采集</button>
+          <button id="admin-btn-refresh-db" type="button" title="依次重新拉取数据库中已有番剧的详情，条目多时耗时较长">更新库内番剧信息</button>
+          <button id="admin-btn-sync-subscribed" type="button" title="把管理员 B 站账号的追番列表同步到本地数据库">同步我的追番</button>
+        </div>
+        <p id="admin-crawl-msg" style="font-size:12px;color:#0369a1;min-height:1.2em"></p>
+      </div>
+
+      <div class="panel-soft" style="padding:18px;margin-bottom:16px">
+        <h3 style="margin-bottom:12px;color:#111827">B 站 Cookie（管理员全局）</h3>
+        <p class="muted" style="font-size:12px;margin-bottom:8px">采集时使用管理员账号的 Cookie 降低风控。可在「个人中心」扫码登录或手动粘贴，本页仅显示状态。</p>
+        <span id="admin-bili-cookie-status" class="muted" style="font-size:12px"></span>
+        <a href="#" data-page="user" style="margin-left:10px;font-size:12px">去个人中心设置 →</a>
+      </div>
+
+      <div class="panel-soft" style="padding:18px">
+        <h3 style="margin-bottom:12px;color:#111827">用户管理</h3>
+        <table style="width:100%;border-collapse:collapse;font-size:13px">
+          <thead>
+            <tr style="text-align:left;border-bottom:1px solid #e5e7eb">
+              <th style="padding:6px">ID</th>
+              <th style="padding:6px">用户名</th>
+              <th style="padding:6px">角色</th>
+              <th style="padding:6px">B站绑定</th>
+              <th style="padding:6px">注册时间</th>
+              <th style="padding:6px">操作</th>
+            </tr>
+          </thead>
+          <tbody id="admin-user-list">
+            <tr><td colspan="6" style="padding:8px">加载中…</td></tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </main>

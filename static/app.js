@@ -47,6 +47,7 @@ function showPage(pageId) {
   if (pageId === "home") loadList();
   if (pageId === "dashboard") loadDashboard();
   if (pageId === "user") loadUserPage();
+  if (pageId === "admin") loadAdminPage();
 }
 
 // 顶部导航与详情页「返回列表」等所有带 data-page 的链接统一处理
@@ -1082,6 +1083,13 @@ function loadDashboard() {
 // ---------- 用户 ----------
 window.currentUser = null;
 
+function applyAdminNav(user) {
+  const navAdmin = document.getElementById("nav-admin");
+  if (navAdmin) {
+    navAdmin.classList.toggle("hidden", !(user && user.is_admin));
+  }
+}
+
 function loadUserPage() {
   fetch(`${AUTH_BASE}/me`, { credentials: "include" })
     .then(r => r.json())
@@ -1102,6 +1110,7 @@ function loadUserPage() {
         document.getElementById("user-name").classList.add("hidden");
         document.getElementById("btn-logout").classList.add("hidden");
       }
+      applyAdminNav(res.user);
     });
 }
 
@@ -1691,7 +1700,198 @@ fetch(`${AUTH_BASE}/me`, { credentials: "include" })
     document.getElementById("user-name").textContent = res.user.username;
     document.getElementById("user-name").classList.remove("hidden");
     document.getElementById("btn-logout").classList.remove("hidden");
+    applyAdminNav(res.user);
     loadUserPage();
     showPage("home");
     loadList();
   });
+
+// ---------- 后台管理（仅管理员） ----------
+let adminCrawlTimer = null;
+
+function stopAdminCrawlPoll() {
+  if (adminCrawlTimer) { clearInterval(adminCrawlTimer); adminCrawlTimer = null; }
+}
+
+function adminPollCrawlStatus(msgEl) {
+  stopAdminCrawlPoll();
+  adminCrawlTimer = setInterval(() => {
+    fetch(`/admin/crawl/status`, { credentials: "include" })
+      .then(r => r.json())
+      .then(res => {
+        if (!res.ok) return;
+        if (msgEl) msgEl.textContent = res.message || (res.running ? "采集进行中…" : "");
+        if (!res.running) {
+          stopAdminCrawlPoll();
+          document.getElementById("admin-btn-crawl-start").disabled = false;
+          document.getElementById("admin-btn-refresh-db").disabled = false;
+          document.getElementById("admin-btn-sync-subscribed").disabled = false;
+          loadAdminOverview();
+        }
+      })
+      .catch(() => {});
+  }, 2000);
+}
+
+function loadAdminOverview() {
+  fetch(`/admin/overview`, { credentials: "include" })
+    .then(r => r.json())
+    .then(res => {
+      if (!res.ok) { document.getElementById("admin-overview").textContent = "加载失败：" + (res.error || ""); return; }
+      const s = res.stats;
+      const el = document.getElementById("admin-overview");
+      const items = [
+        ["番剧总数", s.bangumi_count],
+        ["分集总数", s.episode_count],
+        ["标签数", s.tag_count],
+        ["注册用户", s.user_count],
+        ["管理员", s.admin_count],
+        ["收藏数", s.favorite_count],
+        ["快照数", s.snapshot_count],
+      ];
+      el.innerHTML = items.map(([k, v]) =>
+        `<span style="background:#f1f5f9;border-radius:6px;padding:8px 14px"><b>${k}</b><br><span style="font-size:18px">${v}</span></span>`
+      ).join("");
+      // 采集状态显示
+      const msg = document.getElementById("admin-crawl-msg");
+      if (res.crawl && res.crawl.message) msg.textContent = res.crawl.message;
+      if (res.crawl && res.crawl.running) {
+        document.getElementById("admin-btn-crawl-start").disabled = true;
+        document.getElementById("admin-btn-refresh-db").disabled = true;
+        document.getElementById("admin-btn-sync-subscribed").disabled = true;
+        adminPollCrawlStatus(msg);
+      }
+    })
+    .catch(() => {});
+}
+
+function loadAdminUsers() {
+  fetch(`/admin/users`, { credentials: "include" })
+    .then(r => r.json())
+    .then(res => {
+      const tbody = document.getElementById("admin-user-list");
+      if (!res.ok) { tbody.innerHTML = `<tr><td colspan="6">加载失败：${escapeHtml(res.error || "")}</td></tr>`; return; }
+      tbody.innerHTML = res.users.map(u => `
+        <tr style="border-bottom:1px solid #f1f5f9">
+          <td style="padding:6px">${u.id}</td>
+          <td style="padding:6px">${escapeHtml(u.username)}</td>
+          <td style="padding:6px">${u.is_admin ? '<span style="color:#b45309;font-weight:600">管理员</span>' : "普通用户"}</td>
+          <td style="padding:6px">${u.bilibili_uid ? "已绑定" : "-"}${u.has_cookie ? " / 有Cookie" : ""}</td>
+          <td style="padding:6px">${(u.created_at || "").replace("T", " ").slice(0, 19)}</td>
+          <td style="padding:6px">
+            <button type="button" data-act="toggle" data-id="${u.id}" data-name="${escapeHtml(u.username)}">${u.is_admin ? "取消管理员" : "设为管理员"}</button>
+            <button type="button" data-act="del" data-id="${u.id}" data-name="${escapeHtml(u.username)}" style="margin-left:6px;color:#b91c1c">删除</button>
+          </td>
+        </tr>`).join("");
+      tbody.querySelectorAll("button[data-act]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const act = btn.dataset.act;
+          const uid = btn.dataset.id;
+          const uname = btn.dataset.name;
+          if (act === "toggle") {
+            fetch(`/admin/users/${uid}/toggle-admin`, { method: "POST", credentials: "include" })
+              .then(r => r.json())
+              .then(res => {
+                if (!res.ok) { alert("操作失败：" + (res.error || "")); return; }
+                loadAdminUsers(); loadAdminOverview();
+              });
+          } else if (act === "del") {
+            if (!confirm(`确定删除用户「${uname}」？该操作不可恢复。`)) return;
+            fetch(`/admin/users/${uid}`, { method: "DELETE", credentials: "include" })
+              .then(r => r.json())
+              .then(res => {
+                if (!res.ok) { alert("操作失败：" + (res.error || "")); return; }
+                loadAdminUsers(); loadAdminOverview();
+              });
+          }
+        });
+      });
+    })
+    .catch(() => {});
+}
+
+function loadAdminPage() {
+  const user = window.currentUser;
+  if (!user || !user.is_admin) {
+    alert("需要管理员权限");
+    showPage("home");
+    return;
+  }
+  loadAdminOverview();
+  loadAdminUsers();
+  fetch(`/api/user/bilibili-cookie`, { credentials: "include" })
+    .then(r => r.json())
+    .then(res => {
+      const el = document.getElementById("admin-bili-cookie-status");
+      if (el) el.textContent = res.has_cookie ? "已设置 B 站 Cookie（采集时带登录态）" : "未设置 B 站 Cookie（采集为游客态，更易触发风控）";
+    })
+    .catch(() => {});
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const btnStart = document.getElementById("admin-btn-crawl-start");
+  if (btnStart) btnStart.addEventListener("click", () => {
+    const year = document.getElementById("admin-crawl-year").value || null;
+    const season = document.getElementById("admin-crawl-season").value || null;
+    const pages = parseInt(document.getElementById("admin-crawl-pages").value, 10) || 2;
+    const delay = parseFloat(document.getElementById("admin-crawl-delay").value) || 3;
+    const msg = document.getElementById("admin-crawl-msg");
+    msg.textContent = "正在启动采集…";
+    btnStart.disabled = true;
+    fetch(`/admin/crawl/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ year: year || null, season: season ? parseInt(season, 10) : null, pages, delay }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        msg.textContent = res.message || "已提交";
+        if (res.using_bilibili_cookie) msg.textContent += "（使用 B 站 Cookie）";
+        if (res.ok) {
+          adminPollCrawlStatus(msg);
+        } else {
+          btnStart.disabled = false;
+        }
+      })
+      .catch(() => { msg.textContent = "请求失败"; btnStart.disabled = false; });
+  });
+
+  const btnRefresh = document.getElementById("admin-btn-refresh-db");
+  if (btnRefresh) btnRefresh.addEventListener("click", () => {
+    const msg = document.getElementById("admin-crawl-msg");
+    msg.textContent = "正在启动库内更新…";
+    btnRefresh.disabled = true;
+    fetch(`/admin/crawl/refresh-in-db`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ delay: parseFloat(document.getElementById("admin-crawl-delay").value) || 4 }),
+    })
+      .then(r => r.json())
+      .then(res => {
+        msg.textContent = res.message || "已提交";
+        if (res.ok) adminPollCrawlStatus(msg);
+        else btnRefresh.disabled = false;
+      })
+      .catch(() => { msg.textContent = "请求失败"; btnRefresh.disabled = false; });
+  });
+
+  const btnSync = document.getElementById("admin-btn-sync-subscribed");
+  if (btnSync) btnSync.addEventListener("click", () => {
+    const msg = document.getElementById("admin-crawl-msg");
+    msg.textContent = "正在启动追番同步…";
+    btnSync.disabled = true;
+    fetch(`/admin/crawl/sync-subscribed`, {
+      method: "POST",
+      credentials: "include",
+    })
+      .then(r => r.json())
+      .then(res => {
+        msg.textContent = res.message || "已提交";
+        if (res.ok) adminPollCrawlStatus(msg);
+        else btnSync.disabled = false;
+      })
+      .catch(() => { msg.textContent = "请求失败"; btnSync.disabled = false; });
+  });
+});

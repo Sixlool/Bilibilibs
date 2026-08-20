@@ -22,8 +22,8 @@ def create_app(config_overrides=None):
     from models import db, init_db
     init_db(app)
 
-    # 跨域
-    CORS(app, supports_credentials=True, origins=["http://127.0.0.1:5000", "http://localhost:5000"])
+    # 跨域（来源白名单由 config.CORS_ORIGINS 控制；同域部署时为空列表即可）
+    CORS(app, supports_credentials=True, origins=app.config.get("CORS_ORIGINS") or [])
 
     # 登录
     login_manager = LoginManager()
@@ -39,8 +39,10 @@ def create_app(config_overrides=None):
     from app.routes.api import api_bp
     from app.routes.auth import auth_bp
     from app.routes.pages import pages_bp
+    from app.routes.admin import admin_bp
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(pages_bp, url_prefix="/")
+    app.register_blueprint(admin_bp, url_prefix="/admin")
 
     return app

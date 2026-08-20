@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS user (
     bilibili_uid BIGINT NULL COMMENT 'B站用户mid，扫码登录时关联',
     bilibili_sessdata VARCHAR(512) NOT NULL DEFAULT '' COMMENT 'B站Cookie sessdata，采集时带登录态降低412',
     bilibili_bili_jct VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'B站Cookie bili_jct',
+    is_admin TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否管理员（1=可进入后台管理）',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uk_username (username),
