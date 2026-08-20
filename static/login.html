@@ -6,25 +6,29 @@
   <title>登录 - B站动漫番剧数据分析与可视化系统</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1f2937; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .gate-content { max-width: 720px; width: 100%; padding: 28px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
-    .gate-content h2 { margin-bottom: 20px; text-align: center; font-size: 1.15rem; color: #111827; }
-    .gate-row { display: flex; gap: 24px; align-items: stretch; }
-    .gate-col { flex: 1; min-width: 0; }
-    .gate-col + .gate-col { border-left: 1px solid #e5e7eb; padding-left: 24px; }
-    .gate-col h3 { font-size: 14px; color: #111827; margin-bottom: 14px; text-align: center; }
-    .user-form input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; color: #1f2937; }
-    .user-form .btn-row { display: flex; gap: 10px; }
+    body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f5f6f8; color: #1f2937; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .gate-content { max-width: 380px; width: 100%; padding: 28px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+    .gate-content h2 { margin-bottom: 20px; text-align: center; font-size: 1.1rem; color: #111827; }
+    .gate-content h3 { font-size: 14px; color: #111827; margin-bottom: 14px; text-align: center; }
+    .user-form input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; color: #1f2937; font-size: 14px; }
+    .user-form input:focus { outline: none; border-color: #0284c7; box-shadow: 0 0 0 3px rgba(2,132,199,.12); }
+    .user-form .btn-row { display: flex; gap: 10px; margin-bottom: 4px; }
     .user-form button { flex: 1; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
     .user-form button:hover { background: #0369a1; }
     .user-form button.secondary { background: #6b7280; }
     .user-form button.secondary:hover { background: #4b5563; }
     .error { color: #dc2626; margin-top: 8px; font-size: 13px; min-height: 1.2em; }
-    .gate-qr-btn { width: 100%; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
-    .gate-qr-btn:hover { background: #0369a1; }
-    .gate-qr-wrap { margin-top: 12px; padding: 12px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center; }
-    .gate-qr-wrap img { width: 180px; height: 180px; display: block; margin: 0 auto; }
+    .hidden { display: none; }
+    a { color: #0369a1; }
+    /* 二维码区：点「显示登录二维码」后在下边展开 */
+    .qr-section { margin-top: 18px; border-top: 1px dashed #d1d5db; padding-top: 18px; }
+    .gate-qr-btn { width: 100%; padding: 10px; background: #fff; color: #0284c7; border: 1px solid #0284c7; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .gate-qr-btn:hover { background: #f0f9ff; }
+    .gate-qr-wrap { margin-top: 14px; text-align: center; }
+    .gate-qr-wrap .qr-title { font-size: 13px; color: #6b7280; margin-bottom: 10px; }
+    .gate-qr-wrap img { width: 180px; height: 180px; display: block; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px; background: #fff; }
     .gate-qr-status { font-size: 12px; color: #0369a1; margin-top: 10px; min-height: 1.2em; }
+    /* 绑定面板 */
     .bind-panel { margin-top: 20px; padding: 16px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; }
     .bind-panel h3 { font-size: 14px; color: #92400e; margin-bottom: 8px; }
     .bind-panel p { font-size: 12px; color: #78350f; text-align: left; margin-bottom: 12px; }
@@ -32,42 +36,50 @@
     .tabs button { flex: 1; padding: 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; color: #4b5563; }
     .tabs button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
     .bind-note { font-size: 11px; color: #92400e; margin-top: 8px; text-align: left; }
-    .hidden { display: none; }
-    a { color: #0369a1; }
-    @media (max-width: 640px) {
-      .gate-row { flex-direction: column; }
-      .gate-col + .gate-col { border-left: none; border-top: 1px solid #e5e7eb; padding-left: 0; padding-top: 20px; }
-    }
+    .back-link { display: block; text-align: center; margin-top: 14px; font-size: 13px; }
   </style>
 </head>
 <body>
   <div class="gate-content">
     <h2>B站动漫番剧数据分析与可视化系统</h2>
-    <div class="gate-row">
-      <!-- 左：账号密码登录 / 注册 -->
-      <div class="gate-col">
-        <h3>账号密码登录</h3>
-        <form id="pw-form" class="user-form" autocomplete="on">
-          <input type="text" id="pw-username" placeholder="用户名" autocomplete="username">
-          <input type="password" id="pw-password" placeholder="密码" autocomplete="current-password">
-          <div class="btn-row">
-            <button type="submit" id="btn-pw-login">登录</button>
-            <button type="button" id="btn-pw-register" class="secondary">注册</button>
-          </div>
-          <div id="pw-error" class="error"></div>
-        </form>
-      </div>
-      <!-- 右：B 站扫码登录 -->
-      <div class="gate-col">
-        <h3>B 站扫码登录</h3>
+
+    <!-- ===== 登录视图（默认） ===== -->
+    <div id="view-login">
+      <h3>账号密码登录</h3>
+      <form id="pw-form" class="user-form" autocomplete="on">
+        <input type="text" id="pw-username" placeholder="用户名" autocomplete="username">
+        <input type="password" id="pw-password" placeholder="密码" autocomplete="current-password">
+        <div class="btn-row">
+          <button type="submit" id="btn-pw-login">登录</button>
+          <button type="button" id="btn-pw-register" class="secondary">注册</button>
+        </div>
+        <div id="pw-error" class="error"></div>
+      </form>
+      <!-- 扫码区：点按钮后在下边展开二维码 -->
+      <div class="qr-section">
         <button id="gate-btn-show-qr" type="button" class="gate-qr-btn">显示登录二维码</button>
         <div id="gate-qr-wrap" class="gate-qr-wrap hidden">
+          <p class="qr-title">B 站扫码登录</p>
           <img id="gate-qr-img" alt="登录二维码">
           <p id="gate-qr-status" class="gate-qr-status">请使用 B 站 App 扫描二维码</p>
         </div>
       </div>
     </div>
-    <!-- 绑定面板（扫码成功但未绑定系统账号时显示） -->
+
+    <!-- ===== 注册视图（点「注册」后切换到这里） ===== -->
+    <div id="view-register" class="hidden">
+      <h3>注册新账号</h3>
+      <form id="reg-form" class="user-form" autocomplete="off">
+        <input type="text" id="reg-username" placeholder="用户名" autocomplete="username">
+        <input type="password" id="reg-password" placeholder="密码" autocomplete="new-password">
+        <input type="email" id="reg-email" placeholder="邮箱（可选）" autocomplete="email">
+        <button type="submit" id="btn-reg-submit">注册</button>
+        <div id="reg-error" class="error"></div>
+      </form>
+      <a class="back-link" id="link-back-login" href="#">← 返回登录</a>
+    </div>
+
+    <!-- ===== 绑定面板（扫码成功但未绑定系统账号时显示） ===== -->
     <div id="gate-bind-view" class="bind-panel hidden">
       <h3>绑定系统账号</h3>
       <p>该 B 站账号（UID: <b id="bind-bili-uid">-</b>）尚未绑定本系统账号。绑定后下次可直接用账号密码登录，无需扫码。</p>

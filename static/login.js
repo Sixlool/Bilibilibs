@@ -1,5 +1,5 @@
 /**
- * 登录页：单页双区 —— 左侧账号密码登录/注册，右侧 B 站扫码登录。
+ * 登录页：账号密码登录（默认视图）+ 注册（切换视图）+ B 站扫码（点按钮展开二维码）。
  * 扫码成功但未绑定系统账号时，显示绑定面板（绑定已有账号 / 注册新账号并绑定）。
  */
 const API_BASE = "/api";
@@ -17,24 +17,33 @@ function stopGateBiliQrPoll() {
   if (gateBiliQrPollTimer) { clearInterval(gateBiliQrPollTimer); gateBiliQrPollTimer = null; }
 }
 
-// ---------- 账号密码登录 / 注册 ----------
-function showPwError(msg) {
-  document.getElementById("pw-error").textContent = msg;
+// ---------- 视图切换：登录 ⇄ 注册 ----------
+function showLoginView() {
+  document.getElementById("view-login").classList.remove("hidden");
+  document.getElementById("view-register").classList.add("hidden");
+  document.getElementById("pw-error").textContent = "";
 }
-function pwDone(btn, okText) {
-  btn.textContent = okText;
-  setTimeout(() => window.location.replace("/"), 400);
+function showRegisterView() {
+  stopGateBiliQrPoll();
+  document.getElementById("view-login").classList.add("hidden");
+  document.getElementById("view-register").classList.remove("hidden");
+  document.getElementById("reg-error").textContent = "";
 }
-function submitPw(mode) {
+document.getElementById("btn-pw-register").addEventListener("click", showRegisterView);
+document.getElementById("link-back-login").addEventListener("click", (e) => { e.preventDefault(); showLoginView(); });
+
+// ---------- 账号密码登录 ----------
+document.getElementById("pw-form").addEventListener("submit", (e) => {
+  e.preventDefault();
   const username = document.getElementById("pw-username").value.trim();
   const password = document.getElementById("pw-password").value;
-  if (!username || !password) { showPwError("请输入用户名和密码"); return; }
-  showPwError("");
-  const btn = mode === "login" ? document.getElementById("btn-pw-login") : document.getElementById("btn-pw-register");
-  const orig = btn.textContent;
+  const errEl = document.getElementById("pw-error");
+  if (!username || !password) { errEl.textContent = "请输入用户名和密码"; return; }
+  errEl.textContent = "";
+  const btn = document.getElementById("btn-pw-login");
   btn.disabled = true;
-  btn.textContent = mode === "login" ? "登录中..." : "注册中...";
-  fetch(`${AUTH_BASE}/${mode}`, {
+  btn.textContent = "登录中...";
+  fetch(`${AUTH_BASE}/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -43,21 +52,56 @@ function submitPw(mode) {
     .then(r => r.json())
     .then(res => {
       if (res.ok) {
-        pwDone(btn, mode === "login" ? "登录成功，跳转中..." : "注册成功，跳转中...");
+        btn.textContent = "登录成功，跳转中...";
+        window.location.replace("/");
       } else {
         btn.disabled = false;
-        btn.textContent = orig;
-        showPwError(res.error || "操作失败，请重试");
+        btn.textContent = "登录";
+        errEl.textContent = res.error || "登录失败，请检查用户名和密码";
       }
     })
     .catch(() => {
       btn.disabled = false;
-      btn.textContent = orig;
-      showPwError("网络异常，请重试");
+      btn.textContent = "登录";
+      errEl.textContent = "网络异常，请重试";
     });
-}
-document.getElementById("pw-form").addEventListener("submit", (e) => { e.preventDefault(); submitPw("login"); });
-document.getElementById("btn-pw-register").addEventListener("click", () => submitPw("register"));
+});
+
+// ---------- 注册 ----------
+document.getElementById("reg-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const username = document.getElementById("reg-username").value.trim();
+  const password = document.getElementById("reg-password").value;
+  const email = document.getElementById("reg-email").value.trim();
+  const errEl = document.getElementById("reg-error");
+  if (!username || !password) { errEl.textContent = "请输入用户名和密码"; return; }
+  errEl.textContent = "";
+  const btn = document.getElementById("btn-reg-submit");
+  btn.disabled = true;
+  btn.textContent = "注册中...";
+  fetch(`${AUTH_BASE}/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ username, password, email }),
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res.ok) {
+        btn.textContent = "注册成功，跳转中...";
+        window.location.replace("/");
+      } else {
+        btn.disabled = false;
+        btn.textContent = "注册";
+        errEl.textContent = res.error || "注册失败，请重试";
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = "注册";
+      errEl.textContent = "网络异常，请重试";
+    });
+});
 
 // ---------- 绑定面板（扫码成功但未绑定） ----------
 function showBindView(bindToken, bilibiliUid) {
@@ -120,7 +164,7 @@ document.getElementById("bind-form").addEventListener("submit", (e) => {
     });
 });
 
-// ---------- B 站扫码登录 ----------
+// ---------- B 站扫码登录（点按钮后在下边展开二维码） ----------
 document.getElementById("gate-btn-show-qr").addEventListener("click", () => {
   const wrap = document.getElementById("gate-qr-wrap");
   const img = document.getElementById("gate-qr-img");
