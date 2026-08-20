@@ -73,7 +73,10 @@ python run.py
 
 浏览器访问：http://127.0.0.1:5000
 
-- **入口**：打开后默认使用 **B 站扫码登录**（点击「显示登录二维码」，用 B 站 App 扫码即可登录本系统，无需记住本系统密码）。首次扫码会自动创建本系统账号；也可点击「使用账号密码登录」展开传统注册/登录。
+- **入口**：打开后默认使用 **B 站扫码登录**（点击「显示登录二维码」，用 B 站 App 扫码即可登录本系统）。
+  - **首次扫码（未绑定账号）**：进入「绑定系统账号」页面——可**绑定已有账号**（输入用户名+密码）或**注册新账号并绑定**。绑定后该 B 站账号与本系统账号永久关联。
+  - **再次扫码（已绑定）**：直接登录对应账号。
+  - **免扫码登录**：绑定后可用账号密码直接登录（登录页也可用账号密码登录）。
 - **后台管理**：在 `.env` 中设置 `ADMIN_USERNAME=admin` 后，用该用户名注册的账号自动成为管理员（仅首个管理员），导航栏出现「后台管理」入口。数据采集、库内更新、追番同步、用户管理等操作全部收口在后台。
 - **采集（管理员）**：进入「后台管理 → 数据采集」，选择年份/季度/页数/间隔后点击「开始采集」；也可点击「更新库内番剧信息」「同步我的追番」。
 - **B 站 Cookie**：扫码登录后自动保存；也可在个人中心手动粘贴 `sessdata`、`bili_jct` 或再次扫码更新（后台采集会使用管理员账号的 Cookie）。
@@ -119,6 +122,7 @@ docker compose up -d --build
 - `POST/DELETE /api/favorite/<media_id>`：收藏/取消收藏（需登录）
 - `GET /api/favorites`：当前用户收藏列表（需登录）
 - `POST /auth/register`、`POST /auth/login`、`POST /auth/logout`、`GET /auth/me`（含 `is_admin`）
+- `POST /auth/bind`：绑定 B 站账号到系统账号（`mode=bind_existing` 绑定已有账号 / `mode=register` 注册并绑定）
 - `GET /admin/overview`：数据统计概览（需管理员）
 - `POST /admin/crawl/start`、`POST /admin/crawl/refresh-in-db`、`POST /admin/crawl/sync-subscribed`、`GET /admin/crawl/status`：后台采集（需管理员）
 - `GET /admin/users`、`POST /admin/users/<id>/toggle-admin`、`DELETE /admin/users/<id>`：用户管理（需管理员）

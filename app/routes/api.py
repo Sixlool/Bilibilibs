@@ -539,7 +539,8 @@ def bilibili_qr_poll():
                         u.bilibili_uid = int(bilibili_uid) if isinstance(bilibili_uid, (int, float)) else bilibili_uid
                     db.session.commit()
                 return jsonify({"ok": True, "status": "done", "message": "B 站登录成功，Cookie 已保存"})
-            # 未登录：按 B 站 UID 查找或创建用户并登录本系统（无 UID 时用 Cookie 生成唯一用户名）
+            # 未登录：扫码成功 → 按 B 站 UID 查找已绑定账号
+            # 有绑定 → 直接登录；无绑定 → 返回 bind_token 引导绑定（不自动建号）
             u = None
             if bilibili_uid is not None:
                 try:
@@ -548,29 +549,23 @@ def bilibili_qr_poll():
                     bilibili_uid = None
             if bilibili_uid is not None:
                 u = User.query.filter_by(bilibili_uid=bilibili_uid).first()
-            if u is None:
-                # 无 UID 或未找到：用 sessdata 生成唯一用户名创建新用户（部分 B 站接口不返回 DedeUserID）
-                base_username = "bili_" + (str(bilibili_uid) if bilibili_uid is not None else "cookie_" + secrets.token_hex(8))
-                username = base_username
-                n = 0
-                while User.query.filter_by(username=username).first():
-                    n += 1
-                    username = base_username + "_" + str(n)
-                u = User(
-                    username=username,
-                    password_hash=generate_password_hash(secrets.token_hex(16), method="pbkdf2:sha256"),
-                    bilibili_uid=bilibili_uid,
-                    bilibili_sessdata=sessdata,
-                    bilibili_bili_jct=bili_jct,
-                )
-                db.session.add(u)
-                db.session.commit()
-            else:
+            if u is not None:
+                # 已绑定：更新 Cookie 并登录
                 u.bilibili_sessdata = sessdata
                 u.bilibili_bili_jct = bili_jct
                 db.session.commit()
-            login_user(u)
-            return jsonify({"ok": True, "status": "done", "message": "登录成功", "user": {"id": u.id, "username": u.username}})
+                login_user(u)
+                return jsonify({"ok": True, "status": "done", "message": "登录成功", "user": {"id": u.id, "username": u.username}})
+            # 未绑定：暂存凭据，返回绑定 token 引导注册/绑定
+            bind_token = _create_bind_token(sessdata, bili_jct, bilibili_uid)
+            return jsonify({
+                "ok": True,
+                "status": "done",
+                "needs_bind": True,
+                "bind_token": bind_token,
+                "bilibili_uid": bilibili_uid,
+                "message": "该 B 站账号尚未绑定系统账号，请完成绑定",
+            })
         except Exception as e:
             emsg = str(e)
             if "cryptography" in emsg and "caching_sha2_password" in emsg:
@@ -580,6 +575,42 @@ def bilibili_qr_poll():
         # B 站已确认登录但未拿到完整凭据（新版接口可能变更），给出准确提示而非「二维码已过期」
         return jsonify({"ok": False, "status": "error", "error": "已确认登录，但获取登录凭据失败，请点击「显示登录二维码」重试"}), 502
     return jsonify({"ok": True, "status": status})
+
+
+# ── 扫码登录绑定暂存 ─────────────────────────────────────────────────────────
+# 扫码成功但 B 站账号未绑定系统账号时，暂存凭据生成一次性 bind_token（内存态，
+# 进程内有效，10 分钟过期），前端凭 token 走绑定流程。多 worker 部署下建议换 Redis，
+# 单进程/开发环境内存即可。
+import time as _time
+
+_BIND_TOKENS = {}  # token -> { sessdata, bili_jct, bilibili_uid, created_at }
+BIND_TOKEN_TTL = 600  # 10 分钟
+
+
+def _create_bind_token(sessdata, bili_jct, bilibili_uid):
+    """生成一次性绑定 token 并暂存 B 站凭据"""
+    global _BIND_TOKENS
+    token = secrets.token_hex(24)
+    _BIND_TOKENS[token] = {
+        "sessdata": sessdata,
+        "bili_jct": bili_jct,
+        "bilibili_uid": bilibili_uid,
+        "created_at": _time.time(),
+    }
+    # 顺手清理过期 token
+    _BIND_TOKENS = {k: v for k, v in _BIND_TOKENS.items() if _time.time() - v["created_at"] < BIND_TOKEN_TTL}
+    return token
+
+
+def _consume_bind_token(token):
+    """取出并销毁绑定 token；不存在或过期返回 None"""
+    global _BIND_TOKENS
+    rec = _BIND_TOKENS.pop(token, None)
+    if not rec:
+        return None
+    if _time.time() - rec["created_at"] > BIND_TOKEN_TTL:
+        return None
+    return rec
 
 
 # 当前用户采集进度（user_id -> { running, page, pages, items, message }），供前端轮询

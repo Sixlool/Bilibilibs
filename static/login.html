@@ -14,20 +14,48 @@
     .gate-qr-btn:hover { background: #0369a1; }
     .user-form input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; color: #1f2937; }
     .user-form button { width: 100%; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
-    .error { color: #dc2626; margin-top: 8px; }
+    .user-form button.secondary { background: #6b7280; margin-top: 8px; }
+    .error { color: #dc2626; margin-top: 8px; font-size: 13px; }
     .hidden { display: none; }
     a { color: #0369a1; }
     .gate-qr-panel { margin-top: 16px; padding: 16px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center; }
+    .bind-panel { margin-top: 16px; padding: 16px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; }
+    .bind-panel h3 { font-size: 14px; color: #92400e; margin-bottom: 8px; }
+    .bind-panel p { font-size: 12px; color: #78350f; text-align: left; margin-bottom: 12px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+    .tabs button { flex: 1; padding: 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; color: #4b5563; }
+    .tabs button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
+    .bind-note { font-size: 11px; color: #92400e; margin-top: 8px; text-align: left; }
   </style>
 </head>
 <body>
   <div class="gate-content">
     <h2>B站动漫番剧数据分析与可视化系统</h2>
-    <p>使用 B 站扫码登录</p>
-    <button id="gate-btn-show-qr" type="button" class="gate-qr-btn">显示登录二维码</button>
-    <div id="gate-qr-wrap" class="hidden gate-qr-panel">
-      <img id="gate-qr-img" alt="登录二维码" style="width:200px;height:200px;display:block;margin:0 auto">
-      <p id="gate-qr-status" style="font-size:12px;color:#0369a1;margin-top:12px">请使用 B 站 App 扫描二维码</p>
+    <!-- 扫码面板 -->
+    <div id="gate-qr-view">
+      <p>使用 B 站扫码登录</p>
+      <button id="gate-btn-show-qr" type="button" class="gate-qr-btn">显示登录二维码</button>
+      <div id="gate-qr-wrap" class="hidden gate-qr-panel">
+        <img id="gate-qr-img" alt="登录二维码" style="width:200px;height:200px;display:block;margin:0 auto">
+        <p id="gate-qr-status" style="font-size:12px;color:#0369a1;margin-top:12px">请使用 B 站 App 扫描二维码</p>
+      </div>
+    </div>
+    <!-- 绑定面板（扫码成功但未绑定系统账号时显示） -->
+    <div id="gate-bind-view" class="bind-panel hidden">
+      <h3>绑定系统账号</h3>
+      <p>该 B 站账号（UID: <b id="bind-bili-uid">-</b>）尚未绑定本系统账号。绑定后下次可直接用账号密码登录，无需扫码。</p>
+      <div class="tabs">
+        <button type="button" id="tab-bind-existing" class="active">绑定已有账号</button>
+        <button type="button" id="tab-register">注册新账号并绑定</button>
+      </div>
+      <form id="bind-form" class="user-form" autocomplete="off">
+        <input type="text" id="bind-username" placeholder="用户名" autocomplete="username">
+        <input type="password" id="bind-password" placeholder="密码" autocomplete="current-password">
+        <input type="email" id="bind-email" placeholder="邮箱（注册时可选）" class="hidden" autocomplete="email">
+        <button type="submit" id="btn-bind-submit">绑定并登录</button>
+        <div id="bind-error" class="error"></div>
+      </form>
+      <p class="bind-note">提示：绑定凭据 10 分钟内有效，过期请重新扫码。</p>
     </div>
   </div>
   <script src="login.js"></script>
