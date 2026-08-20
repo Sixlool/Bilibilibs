@@ -26,6 +26,9 @@
     .tabs button { flex: 1; padding: 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; color: #4b5563; }
     .tabs button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
     .bind-note { font-size: 11px; color: #92400e; margin-top: 8px; text-align: left; }
+    .gate-switch { text-align: center; margin-top: 16px; font-size: 13px; color: #6b7280; }
+    .gate-switch a { cursor: pointer; font-weight: 600; }
+    .pw-login-panel { margin-top: 16px; padding: 16px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; }
   </style>
 </head>
 <body>
@@ -39,6 +42,18 @@
         <img id="gate-qr-img" alt="登录二维码" style="width:200px;height:200px;display:block;margin:0 auto">
         <p id="gate-qr-status" style="font-size:12px;color:#0369a1;margin-top:12px">请使用 B 站 App 扫描二维码</p>
       </div>
+      <p class="gate-switch">已绑定账号？<a id="link-goto-pw-login">使用账号密码登录</a></p>
+    </div>
+    <!-- 账号密码登录面板 -->
+    <div id="gate-pw-login-view" class="hidden">
+      <p>账号密码登录</p>
+      <form id="pw-login-form" class="user-form" autocomplete="on">
+        <input type="text" id="pw-login-username" placeholder="用户名" autocomplete="username">
+        <input type="password" id="pw-login-password" placeholder="密码" autocomplete="current-password">
+        <button type="submit" id="btn-pw-login">登录</button>
+        <div id="pw-login-error" class="error"></div>
+      </form>
+      <p class="gate-switch">未绑定 B 站账号？<a id="link-goto-qr">返回扫码登录</a></p>
     </div>
     <!-- 绑定面板（扫码成功但未绑定系统账号时显示） -->
     <div id="gate-bind-view" class="bind-panel hidden">

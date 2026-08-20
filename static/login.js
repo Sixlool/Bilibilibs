@@ -20,7 +20,54 @@ function stopGateBiliQrPoll() {
 function showQrView() {
   document.getElementById("gate-qr-view").classList.remove("hidden");
   document.getElementById("gate-bind-view").classList.add("hidden");
+  document.getElementById("gate-pw-login-view").classList.add("hidden");
 }
+
+function showPwLoginView() {
+  stopGateBiliQrPoll();
+  document.getElementById("gate-qr-view").classList.add("hidden");
+  document.getElementById("gate-bind-view").classList.add("hidden");
+  document.getElementById("gate-pw-login-view").classList.remove("hidden");
+}
+
+// 扫码 ⇄ 账号密码 视图切换
+document.getElementById("link-goto-pw-login").addEventListener("click", () => showPwLoginView());
+document.getElementById("link-goto-qr").addEventListener("click", () => { showQrView(); });
+
+// 账号密码登录
+document.getElementById("pw-login-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const username = document.getElementById("pw-login-username").value.trim();
+  const password = document.getElementById("pw-login-password").value;
+  const errEl = document.getElementById("pw-login-error");
+  if (!username || !password) { errEl.textContent = "请输入用户名和密码"; return; }
+  errEl.textContent = "";
+  const btn = document.getElementById("btn-pw-login");
+  btn.disabled = true;
+  btn.textContent = "登录中...";
+  fetch(`${AUTH_BASE}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ username, password }),
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res.ok) {
+        btn.textContent = "登录成功，跳转中...";
+        window.location.replace("/");
+      } else {
+        btn.disabled = false;
+        btn.textContent = "登录";
+        errEl.textContent = res.error || "登录失败，请检查用户名和密码";
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = "登录";
+      errEl.textContent = "网络异常，请重试";
+    });
+});
 
 function showBindView(bindToken, bilibiliUid) {
   stopGateBiliQrPoll();
