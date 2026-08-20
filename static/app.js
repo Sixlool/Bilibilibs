@@ -1660,39 +1660,84 @@ function loadSubscribedPage() {
     });
 }
 
+// 追番分页状态（独立于番剧列表的全局变量）
+let subPage = 1;
+let subPageSize = 20;
+let subAllItems = [];
+
+function renderSubscribedPageItems() {
+  const listEl = document.getElementById("bili-subscribed-list");
+  if (!listEl) return;
+  const total = subAllItems.length;
+  const totalPages = Math.max(1, Math.ceil(total / subPageSize));
+  if (subPage > totalPages) subPage = totalPages;
+  const start = (subPage - 1) * subPageSize;
+  const pageItems = subAllItems.slice(start, start + subPageSize);
+  if (!pageItems.length) {
+    listEl.innerHTML = "<p style='color:#1f2937'>暂无追番，或请先使用 B 站扫码登录</p>";
+  } else {
+    listEl.innerHTML = pageItems.map(item => {
+      const href = item.media_id ? `https://www.bilibili.com/bangumi/media/md${item.media_id}` : `https://www.bilibili.com/bangumi/play/ss${item.season_id || ''}`;
+      return `
+        <a class="card" href="${href}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">
+          <img src="${normalizeCoverUrl(item.cover) || ''}" alt="${escapeHtml(item.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 fill=%22%23374151%22 text-anchor=%22middle%22>无图</text></svg>'">
+          <div class="card-body">
+            <div class="card-title">${escapeHtml(item.title)}</div>
+            <div class="card-meta">播放 ${formatNum(item.play_count)} · 追番 ${formatNum(item.follow_count)}${item.new_ep_index ? " · " + escapeHtml(item.new_ep_index) : ""}</div>
+          </div>
+        </a>`;
+    }).join("");
+  }
+  // 分页导航
+  const pagEl = document.getElementById("bili-subscribed-pagination");
+  if (pagEl) {
+    if (totalPages <= 1) {
+      pagEl.innerHTML = "";
+    } else {
+      pagEl.innerHTML = `
+        <button ${subPage <= 1 ? "disabled" : ""} data-subpage="${subPage - 1}">上一页</button>
+        <span style="align-self:center">第 ${subPage} / ${totalPages} 页，共 ${total} 条</span>
+        <button ${subPage >= totalPages ? "disabled" : ""} data-subpage="${subPage + 1}">下一页</button>
+      `;
+      pagEl.querySelectorAll("button[data-subpage]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          subPage = parseInt(btn.dataset.subpage, 10);
+          renderSubscribedPageItems();
+          // 切页后滚回追番列表顶部
+          const sec = document.getElementById("page-subscribed");
+          if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+  }
+}
+
 function loadBilibiliSubscribed() {
   const msgEl = document.getElementById("bili-subscribed-msg");
   const listEl = document.getElementById("bili-subscribed-list");
   const chartsWrap = document.getElementById("bili-subscribed-charts");
+  const pagEl = document.getElementById("bili-subscribed-pagination");
   if (!msgEl || !listEl) return;
   msgEl.textContent = "加载中…";
   listEl.innerHTML = "";
+  if (pagEl) pagEl.innerHTML = "";
   if (chartsWrap) chartsWrap.classList.add("hidden");
   fetch(`${API_BASE}/user/bilibili-subscribed-bangumi`, { credentials: "include" })
     .then(r => r.json())
     .then(res => {
       if (!res.ok) {
         msgEl.textContent = res.error || "加载失败";
-        if (res.items && res.items.length) listEl.innerHTML = "";
         return;
       }
-      msgEl.textContent = res.items && res.items.length ? `共 ${res.items.length} 部追番` : "";
-      if (!res.items || !res.items.length) {
+      subAllItems = (res.items || []).filter(Boolean);
+      subPage = 1;
+      msgEl.textContent = subAllItems.length ? `共 ${subAllItems.length} 部追番` : "";
+      if (!subAllItems.length) {
         listEl.innerHTML = "<p style='color:#1f2937'>暂无追番，或请先使用 B 站扫码登录</p>";
         return;
       }
-      listEl.innerHTML = res.items.map(item => {
-        const href = item.media_id ? `https://www.bilibili.com/bangumi/media/md${item.media_id}` : `https://www.bilibili.com/bangumi/play/ss${item.season_id || ''}`;
-        return `
-          <a class="card" href="${href}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">
-            <img src="${normalizeCoverUrl(item.cover) || ''}" alt="${escapeHtml(item.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 fill=%22%23374151%22 text-anchor=%22middle%22>无图</text></svg>'">
-            <div class="card-body">
-              <div class="card-title">${escapeHtml(item.title)}</div>
-              <div class="card-meta">播放 ${formatNum(item.play_count)} · 追番 ${formatNum(item.follow_count)}${item.new_ep_index ? " · " + escapeHtml(item.new_ep_index) : ""}</div>
-            </div>
-          </a>`;
-      }).join("");
-      drawBilibiliSubscribedCharts(res.items);
+      renderSubscribedPageItems();
+      drawBilibiliSubscribedCharts(subAllItems);
     })
     .catch(() => { msgEl.textContent = "请求失败"; });
 }
