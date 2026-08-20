@@ -5,44 +5,218 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>登录 - B站动漫番剧数据分析与可视化系统</title>
   <style>
+    /* ===== 设计令牌（B站番剧 × 数据可视化） ===== */
+    :root {
+      --bg-0: #0b1120;            /* 页面最深 */
+      --bg-1: rgba(17, 26, 51, 0.72);  /* 卡片玻璃底 */
+      --bg-2: rgba(26, 37, 66, 0.6);   /* 输入框/区块 */
+      --accent: #fb7299;          /* B站粉：主强调 */
+      --accent-deep: #e04f7c;
+      --cyan: #00aeec;            /* B站蓝：辅助 */
+      --text-0: #f1f5f9;
+      --text-1: #94a3b8;
+      --text-2: #64748b;
+      --border: rgba(148, 163, 184, 0.16);
+      --ok: #34d399;
+      --warn-bg: rgba(251, 191, 36, 0.12);
+      --warn-border: rgba(251, 191, 36, 0.35);
+      --warn-text: #fbbf24;
+      --radius-lg: 20px;
+      --radius-md: 12px;
+      --radius-sm: 9px;
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1f2937; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .gate-content { max-width: 720px; width: 100%; padding: 28px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
-    .gate-content h2 { margin-bottom: 20px; text-align: center; font-size: 1.15rem; color: #111827; }
-    .gate-row { display: flex; gap: 24px; align-items: stretch; }
+    html, body { min-height: 100vh; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", -apple-system, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(900px 500px at 12% -10%, rgba(251, 114, 153, 0.16), transparent 60%),
+        radial-gradient(800px 500px at 95% 110%, rgba(0, 174, 236, 0.14), transparent 60%),
+        linear-gradient(160deg, var(--bg-0) 0%, #0e1630 55%, #131a38 100%);
+      color: var(--text-0);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+    /* 背景微网格：数据可视化气质 */
+    body::before {
+      content: "";
+      position: fixed; inset: 0;
+      background-image:
+        linear-gradient(rgba(148,163,184,0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(148,163,184,0.045) 1px, transparent 1px);
+      background-size: 44px 44px;
+      mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black, transparent 85%);
+      -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 40%, black, transparent 85%);
+      pointer-events: none;
+    }
+    .gate-content {
+      position: relative;
+      width: 100%; max-width: 780px;
+      padding: 36px 40px 32px;
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      box-shadow: 0 24px 70px rgba(2, 6, 23, 0.55), inset 0 1px 0 rgba(255,255,255,0.06);
+      animation: gateIn .5s cubic-bezier(.22,.9,.28,1) both;
+    }
+    @keyframes gateIn {
+      from { opacity: 0; transform: translateY(14px) scale(.985); }
+      to { opacity: 1; transform: none; }
+    }
+
+    /* ===== 品牌区（签名元素） ===== */
+    .brand { text-align: center; margin-bottom: 28px; }
+    .brand-badge {
+      width: 52px; height: 52px; margin: 0 auto 14px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 15px;
+      background: linear-gradient(135deg, var(--accent), var(--cyan));
+      box-shadow: 0 8px 26px rgba(251, 114, 153, 0.35);
+      animation: badgeFloat 4s ease-in-out infinite;
+    }
+    @keyframes badgeFloat { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+    .brand-badge svg { width: 28px; height: 28px; }
+    .brand h1 {
+      font-size: 26px; font-weight: 800; letter-spacing: .5px;
+      background: linear-gradient(90deg, #fff 0%, var(--accent) 60%, var(--cyan) 100%);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent; color: transparent;
+    }
+    .brand .sub {
+      margin-top: 6px; font-size: 12.5px; color: var(--text-1); letter-spacing: 2.5px;
+      text-transform: uppercase;
+    }
+
+    /* ===== 双列布局 ===== */
+    .gate-row { display: flex; gap: 28px; }
     .gate-col { flex: 1; min-width: 0; }
-    .gate-col + .gate-col { border-left: 1px solid #e5e7eb; padding-left: 24px; }
-    .gate-col h3 { font-size: 14px; color: #111827; margin-bottom: 14px; text-align: center; }
-    .user-form input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; color: #1f2937; }
+    .gate-col h3 {
+      font-size: 13px; font-weight: 600; color: var(--text-1);
+      letter-spacing: 1px; margin-bottom: 14px; text-align: center;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .gate-col h3::before, .gate-col h3::after {
+      content: ""; flex: 1; height: 1px; background: var(--border);
+    }
+    .user-form input {
+      width: 100%; padding: 11px 14px; margin-bottom: 11px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-2);
+      color: var(--text-0);
+      font-size: 14px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s, background .2s;
+    }
+    .user-form input::placeholder { color: var(--text-2); }
+    .user-form input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(251, 114, 153, 0.18);
+      background: rgba(26, 37, 66, 0.85);
+    }
     .user-form .btn-row { display: flex; gap: 10px; }
-    .user-form button { flex: 1; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
-    .user-form button:hover { background: #0369a1; }
-    .user-form button.secondary { background: #6b7280; }
-    .user-form button.secondary:hover { background: #4b5563; }
-    .error { color: #dc2626; margin-top: 8px; font-size: 13px; min-height: 1.2em; }
-    .gate-qr-btn { width: 100%; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
-    .gate-qr-btn:hover { background: #0369a1; }
-    .gate-qr-wrap { margin-top: 12px; padding: 12px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center; }
-    .gate-qr-wrap img { width: 180px; height: 180px; display: block; margin: 0 auto; }
-    .gate-qr-status { font-size: 12px; color: #0369a1; margin-top: 10px; min-height: 1.2em; }
-    .bind-panel { margin-top: 20px; padding: 16px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; }
-    .bind-panel h3 { font-size: 14px; color: #92400e; margin-bottom: 8px; }
-    .bind-panel p { font-size: 12px; color: #78350f; text-align: left; margin-bottom: 12px; }
+    .user-form button {
+      flex: 1; padding: 11px 10px; border: none; border-radius: var(--radius-sm);
+      font-size: 14px; font-weight: 600; cursor: pointer; color: #fff;
+      background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+      transition: transform .15s, box-shadow .2s, opacity .2s, background .2s;
+      box-shadow: 0 6px 18px rgba(251, 114, 153, 0.28);
+    }
+    .user-form button:hover { transform: translateY(-1px); box-shadow: 0 10px 24px rgba(251, 114, 153, 0.36); }
+    .user-form button:active { transform: translateY(0); }
+    .user-form button:disabled { opacity: .6; cursor: not-allowed; transform: none; }
+    .user-form button.secondary {
+      background: linear-gradient(135deg, #334155, #475569);
+      box-shadow: 0 6px 16px rgba(15, 23, 42, 0.4);
+    }
+    .user-form button.secondary:hover { box-shadow: 0 10px 20px rgba(15, 23, 42, 0.5); }
+    .error { color: #f87171; margin-top: 8px; font-size: 12.5px; min-height: 1.2em; }
+
+    /* ===== 扫码区 ===== */
+    .gate-qr-btn {
+      width: 100%; padding: 11px 10px; border: 1px solid rgba(0,174,236,0.4);
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, rgba(0,174,236,0.18), rgba(0,174,236,0.08));
+      color: var(--cyan); font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: transform .15s, box-shadow .2s, background .2s;
+    }
+    .gate-qr-btn:hover {
+      transform: translateY(-1px);
+      background: linear-gradient(135deg, rgba(0,174,236,0.26), rgba(0,174,236,0.12));
+      box-shadow: 0 8px 20px rgba(0,174,236,0.2);
+    }
+    .gate-qr-wrap {
+      margin-top: 14px; padding: 14px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      text-align: center;
+      animation: qrIn .35s ease both;
+    }
+    @keyframes qrIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: none; } }
+    .gate-qr-wrap img {
+      width: 168px; height: 168px; display: block; margin: 0 auto;
+      border-radius: var(--radius-sm);
+      background: #fff; padding: 6px;
+      image-rendering: pixelated;
+    }
+    .gate-qr-status { font-size: 12px; color: var(--text-1); margin-top: 10px; min-height: 1.2em; }
+
+    /* ===== 绑定面板 ===== */
+    .bind-panel {
+      margin-top: 24px; padding: 18px;
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: var(--radius-md);
+      animation: qrIn .35s ease both;
+    }
+    .bind-panel h3 { font-size: 14px; color: var(--warn-text); margin-bottom: 8px; font-weight: 700; }
+    .bind-panel p { font-size: 12.5px; color: var(--text-1); text-align: left; margin-bottom: 12px; line-height: 1.6; }
+    .bind-panel .user-form input { background: rgba(15, 23, 42, 0.5); }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
-    .tabs button { flex: 1; padding: 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; color: #4b5563; }
-    .tabs button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
-    .bind-note { font-size: 11px; color: #92400e; margin-top: 8px; text-align: left; }
+    .tabs button {
+      flex: 1; padding: 8px; border: 1px solid var(--border);
+      background: transparent; border-radius: var(--radius-sm);
+      cursor: pointer; font-size: 13px; color: var(--text-1);
+      transition: all .2s;
+    }
+    .tabs button.active { background: linear-gradient(135deg, var(--accent), var(--accent-deep)); color: #fff; border-color: transparent; }
+    .bind-note { font-size: 11px; color: var(--text-2); margin-top: 8px; text-align: left; }
     .hidden { display: none; }
-    a { color: #0369a1; }
-    @media (max-width: 640px) {
+    a { color: var(--cyan); }
+
+    /* 无障碍：键盘焦点可见 */
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+    @media (prefers-reduced-motion: reduce) {
+      .gate-content, .gate-qr-wrap, .bind-panel { animation: none; }
+      .brand-badge { animation: none; }
+      .user-form button, .gate-qr-btn { transition: none; }
+    }
+    @media (max-width: 680px) {
+      .gate-content { padding: 26px 20px 24px; }
       .gate-row { flex-direction: column; }
-      .gate-col + .gate-col { border-left: none; border-top: 1px solid #e5e7eb; padding-left: 0; padding-top: 20px; }
     }
   </style>
 </head>
 <body>
   <div class="gate-content">
-    <h2>B站动漫番剧数据分析与可视化系统</h2>
+    <!-- 品牌区 -->
+    <div class="brand">
+      <div class="brand-badge" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M8 5.5v13l11-6.5-11-6.5z" fill="#fff"/>
+          <path d="M5 3.5c.5.8 1.6 1.3 3 1.3s2.5-.5 3-1.3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>
+          <path d="M13 20.5c.5-.8 1.6-1.3 3-1.3s2.5.5 3 1.3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".85"/>
+        </svg>
+      </div>
+      <h1>B站动漫番剧数据分析与可视化系统</h1>
+      <p class="sub">Bangumi · Analytics · Visualization</p>
+    </div>
+
     <div class="gate-row">
       <!-- 左：账号密码登录 / 注册 -->
       <div class="gate-col">
@@ -67,10 +241,11 @@
         </div>
       </div>
     </div>
+
     <!-- 绑定面板（扫码成功但未绑定系统账号时显示） -->
     <div id="gate-bind-view" class="bind-panel hidden">
       <h3>绑定系统账号</h3>
-      <p>该 B 站账号（UID: <b id="bind-bili-uid">-</b>）尚未绑定本系统账号。绑定后下次可直接用账号密码登录，无需扫码。</p>
+      <p>该 B 站账号（UID: <b id="bind-bili-uid" style="color:var(--text-0)">-</b>）尚未绑定本系统账号。绑定后下次可直接用账号密码登录，无需扫码。</p>
       <div class="tabs">
         <button type="button" id="tab-bind-existing" class="active">绑定已有账号</button>
         <button type="button" id="tab-register">注册新账号并绑定</button>
