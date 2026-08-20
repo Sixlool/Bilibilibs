@@ -7,53 +7,65 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: "Microsoft YaHei", sans-serif; background: #f5f6f8; color: #1f2937; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .gate-content { max-width: 360px; width: 100%; padding: 28px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
-    .gate-content h2 { margin-bottom: 16px; text-align: center; font-size: 1.15rem; color: #111827; }
-    .gate-content p { color: #1f2937; font-size: 14px; margin-bottom: 16px; text-align: center; }
-    .gate-qr-btn { width: 100%; padding: 12px; background: #0284c7; color: #fff; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
-    .gate-qr-btn:hover { background: #0369a1; }
+    .gate-content { max-width: 720px; width: 100%; padding: 28px; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.06); }
+    .gate-content h2 { margin-bottom: 20px; text-align: center; font-size: 1.15rem; color: #111827; }
+    .gate-row { display: flex; gap: 24px; align-items: stretch; }
+    .gate-col { flex: 1; min-width: 0; }
+    .gate-col + .gate-col { border-left: 1px solid #e5e7eb; padding-left: 24px; }
+    .gate-col h3 { font-size: 14px; color: #111827; margin-bottom: 14px; text-align: center; }
     .user-form input { width: 100%; padding: 10px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #d1d5db; background: #fff; color: #1f2937; }
-    .user-form button { width: 100%; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
-    .user-form button.secondary { background: #6b7280; margin-top: 8px; }
-    .error { color: #dc2626; margin-top: 8px; font-size: 13px; }
-    .hidden { display: none; }
-    a { color: #0369a1; }
-    .gate-qr-panel { margin-top: 16px; padding: 16px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center; }
-    .bind-panel { margin-top: 16px; padding: 16px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; }
+    .user-form .btn-row { display: flex; gap: 10px; }
+    .user-form button { flex: 1; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    .user-form button:hover { background: #0369a1; }
+    .user-form button.secondary { background: #6b7280; }
+    .user-form button.secondary:hover { background: #4b5563; }
+    .error { color: #dc2626; margin-top: 8px; font-size: 13px; min-height: 1.2em; }
+    .gate-qr-btn { width: 100%; padding: 10px; background: #0284c7; color: #fff; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; }
+    .gate-qr-btn:hover { background: #0369a1; }
+    .gate-qr-wrap { margin-top: 12px; padding: 12px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; text-align: center; }
+    .gate-qr-wrap img { width: 180px; height: 180px; display: block; margin: 0 auto; }
+    .gate-qr-status { font-size: 12px; color: #0369a1; margin-top: 10px; min-height: 1.2em; }
+    .bind-panel { margin-top: 20px; padding: 16px; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; }
     .bind-panel h3 { font-size: 14px; color: #92400e; margin-bottom: 8px; }
     .bind-panel p { font-size: 12px; color: #78350f; text-align: left; margin-bottom: 12px; }
     .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
     .tabs button { flex: 1; padding: 8px; border: 1px solid #d1d5db; background: #fff; border-radius: 6px; cursor: pointer; font-size: 13px; color: #4b5563; }
     .tabs button.active { background: #0284c7; color: #fff; border-color: #0284c7; }
     .bind-note { font-size: 11px; color: #92400e; margin-top: 8px; text-align: left; }
-    .gate-switch { text-align: center; margin-top: 16px; font-size: 13px; color: #6b7280; }
-    .gate-switch a { cursor: pointer; font-weight: 600; }
-    .pw-login-panel { margin-top: 16px; padding: 16px; background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; }
+    .hidden { display: none; }
+    a { color: #0369a1; }
+    @media (max-width: 640px) {
+      .gate-row { flex-direction: column; }
+      .gate-col + .gate-col { border-left: none; border-top: 1px solid #e5e7eb; padding-left: 0; padding-top: 20px; }
+    }
   </style>
 </head>
 <body>
   <div class="gate-content">
     <h2>B站动漫番剧数据分析与可视化系统</h2>
-    <!-- 扫码面板 -->
-    <div id="gate-qr-view">
-      <p>使用 B 站扫码登录</p>
-      <button id="gate-btn-show-qr" type="button" class="gate-qr-btn">显示登录二维码</button>
-      <div id="gate-qr-wrap" class="hidden gate-qr-panel">
-        <img id="gate-qr-img" alt="登录二维码" style="width:200px;height:200px;display:block;margin:0 auto">
-        <p id="gate-qr-status" style="font-size:12px;color:#0369a1;margin-top:12px">请使用 B 站 App 扫描二维码</p>
+    <div class="gate-row">
+      <!-- 左：账号密码登录 / 注册 -->
+      <div class="gate-col">
+        <h3>账号密码登录</h3>
+        <form id="pw-form" class="user-form" autocomplete="on">
+          <input type="text" id="pw-username" placeholder="用户名" autocomplete="username">
+          <input type="password" id="pw-password" placeholder="密码" autocomplete="current-password">
+          <div class="btn-row">
+            <button type="submit" id="btn-pw-login">登录</button>
+            <button type="button" id="btn-pw-register" class="secondary">注册</button>
+          </div>
+          <div id="pw-error" class="error"></div>
+        </form>
       </div>
-      <p class="gate-switch">已绑定账号？<a id="link-goto-pw-login">使用账号密码登录</a></p>
-    </div>
-    <!-- 账号密码登录面板 -->
-    <div id="gate-pw-login-view" class="hidden">
-      <p>账号密码登录</p>
-      <form id="pw-login-form" class="user-form" autocomplete="on">
-        <input type="text" id="pw-login-username" placeholder="用户名" autocomplete="username">
-        <input type="password" id="pw-login-password" placeholder="密码" autocomplete="current-password">
-        <button type="submit" id="btn-pw-login">登录</button>
-        <div id="pw-login-error" class="error"></div>
-      </form>
-      <p class="gate-switch">未绑定 B 站账号？<a id="link-goto-qr">返回扫码登录</a></p>
+      <!-- 右：B 站扫码登录 -->
+      <div class="gate-col">
+        <h3>B 站扫码登录</h3>
+        <button id="gate-btn-show-qr" type="button" class="gate-qr-btn">显示登录二维码</button>
+        <div id="gate-qr-wrap" class="gate-qr-wrap hidden">
+          <img id="gate-qr-img" alt="登录二维码">
+          <p id="gate-qr-status" class="gate-qr-status">请使用 B 站 App 扫描二维码</p>
+        </div>
+      </div>
     </div>
     <!-- 绑定面板（扫码成功但未绑定系统账号时显示） -->
     <div id="gate-bind-view" class="bind-panel hidden">

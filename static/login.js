@@ -1,6 +1,6 @@
 /**
- * 登录页：B 站扫码登录。扫码成功但未绑定系统账号时，进入绑定流程
- * （绑定已有账号 / 注册新账号并绑定），绑定后下次可用账号密码直接登录。
+ * 登录页：单页双区 —— 左侧账号密码登录/注册，右侧 B 站扫码登录。
+ * 扫码成功但未绑定系统账号时，显示绑定面板（绑定已有账号 / 注册新账号并绑定）。
  */
 const API_BASE = "/api";
 const AUTH_BASE = "/auth";
@@ -17,35 +17,24 @@ function stopGateBiliQrPoll() {
   if (gateBiliQrPollTimer) { clearInterval(gateBiliQrPollTimer); gateBiliQrPollTimer = null; }
 }
 
-function showQrView() {
-  document.getElementById("gate-qr-view").classList.remove("hidden");
-  document.getElementById("gate-bind-view").classList.add("hidden");
-  document.getElementById("gate-pw-login-view").classList.add("hidden");
+// ---------- 账号密码登录 / 注册 ----------
+function showPwError(msg) {
+  document.getElementById("pw-error").textContent = msg;
 }
-
-function showPwLoginView() {
-  stopGateBiliQrPoll();
-  document.getElementById("gate-qr-view").classList.add("hidden");
-  document.getElementById("gate-bind-view").classList.add("hidden");
-  document.getElementById("gate-pw-login-view").classList.remove("hidden");
+function pwDone(btn, okText) {
+  btn.textContent = okText;
+  setTimeout(() => window.location.replace("/"), 400);
 }
-
-// 扫码 ⇄ 账号密码 视图切换
-document.getElementById("link-goto-pw-login").addEventListener("click", () => showPwLoginView());
-document.getElementById("link-goto-qr").addEventListener("click", () => { showQrView(); });
-
-// 账号密码登录
-document.getElementById("pw-login-form").addEventListener("submit", (e) => {
-  e.preventDefault();
-  const username = document.getElementById("pw-login-username").value.trim();
-  const password = document.getElementById("pw-login-password").value;
-  const errEl = document.getElementById("pw-login-error");
-  if (!username || !password) { errEl.textContent = "请输入用户名和密码"; return; }
-  errEl.textContent = "";
-  const btn = document.getElementById("btn-pw-login");
+function submitPw(mode) {
+  const username = document.getElementById("pw-username").value.trim();
+  const password = document.getElementById("pw-password").value;
+  if (!username || !password) { showPwError("请输入用户名和密码"); return; }
+  showPwError("");
+  const btn = mode === "login" ? document.getElementById("btn-pw-login") : document.getElementById("btn-pw-register");
+  const orig = btn.textContent;
   btn.disabled = true;
-  btn.textContent = "登录中...";
-  fetch(`${AUTH_BASE}/login`, {
+  btn.textContent = mode === "login" ? "登录中..." : "注册中...";
+  fetch(`${AUTH_BASE}/${mode}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     credentials: "include",
@@ -54,31 +43,31 @@ document.getElementById("pw-login-form").addEventListener("submit", (e) => {
     .then(r => r.json())
     .then(res => {
       if (res.ok) {
-        btn.textContent = "登录成功，跳转中...";
-        window.location.replace("/");
+        pwDone(btn, mode === "login" ? "登录成功，跳转中..." : "注册成功，跳转中...");
       } else {
         btn.disabled = false;
-        btn.textContent = "登录";
-        errEl.textContent = res.error || "登录失败，请检查用户名和密码";
+        btn.textContent = orig;
+        showPwError(res.error || "操作失败，请重试");
       }
     })
     .catch(() => {
       btn.disabled = false;
-      btn.textContent = "登录";
-      errEl.textContent = "网络异常，请重试";
+      btn.textContent = orig;
+      showPwError("网络异常，请重试");
     });
-});
+}
+document.getElementById("pw-form").addEventListener("submit", (e) => { e.preventDefault(); submitPw("login"); });
+document.getElementById("btn-pw-register").addEventListener("click", () => submitPw("register"));
 
+// ---------- 绑定面板（扫码成功但未绑定） ----------
 function showBindView(bindToken, bilibiliUid) {
   stopGateBiliQrPoll();
   currentBindToken = bindToken;
   document.getElementById("bind-bili-uid").textContent = bilibiliUid != null ? bilibiliUid : "未知";
   document.getElementById("bind-error").textContent = "";
-  document.getElementById("gate-qr-view").classList.add("hidden");
   document.getElementById("gate-bind-view").classList.remove("hidden");
 }
 
-// 绑定模式切换：已有账号 / 注册新号
 let bindMode = "bind_existing";
 function setBindMode(mode) {
   bindMode = mode;
@@ -131,6 +120,7 @@ document.getElementById("bind-form").addEventListener("submit", (e) => {
     });
 });
 
+// ---------- B 站扫码登录 ----------
 document.getElementById("gate-btn-show-qr").addEventListener("click", () => {
   const wrap = document.getElementById("gate-qr-wrap");
   const img = document.getElementById("gate-qr-img");
@@ -162,7 +152,7 @@ document.getElementById("gate-btn-show-qr").addEventListener("click", () => {
             .then(pollRes => {
               if (pollRes.status === "done") {
                 if (pollRes.needs_bind) {
-                  // 未绑定：进入绑定流程
+                  // 未绑定：显示绑定面板
                   showBindView(pollRes.bind_token, pollRes.bilibili_uid);
                 } else {
                   stopGateBiliQrPoll();
