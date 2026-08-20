@@ -227,6 +227,7 @@
       <div class="nav-tabs">
         <a href="#" data-page="home">番剧列表</a>
         <a href="#" data-page="dashboard">数据大屏</a>
+        <a href="#" data-page="subscribed">我的追番</a>
         <a href="#" data-page="user" id="nav-user">个人中心</a>
         <a href="#" data-page="admin" id="nav-admin" class="hidden">后台管理</a>
       </div>
@@ -320,6 +321,29 @@
       </div>
     </section>
 
+    <!-- 我的追番 -->
+    <section id="page-subscribed" class="page">
+      <div class="panel-soft" style="padding:18px;margin-bottom:16px">
+        <h3 style="margin-bottom:12px;color:#111827">我的追番</h3>
+        <p class="muted" style="font-size:12px;margin-bottom:8px">拉取当前登录的 B 站账号的追番/追剧列表（需先在个人中心用 B 站扫码登录）。</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
+          <button id="btn-load-bili-subscribed">加载我的 B 站追番</button>
+          <button id="btn-sync-subscribed" type="button">同步追番到本地数据库</button>
+        </div>
+        <p class="muted" style="font-size:11px;margin-bottom:4px">同步后会将追番的详情（含标签）写入本系统，追番标签分布图会更全面。</p>
+        <div id="bili-subscribed-msg" style="font-size:12px;color:#0369a1;min-height:1.2em;margin-bottom:8px"></div>
+        <div id="bili-subscribed-list" class="card-list"></div>
+        <div id="bili-subscribed-charts" class="hidden" style="margin-top:20px">
+          <h4 style="margin-bottom:12px;font-size:14px;color:#111827">追番数据概览</h4>
+          <div class="chart-row" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
+            <div class="chart-box" style="height:280px"><h4 style="font-size:13px;margin-bottom:8px;color:#111827">追番 · 播放量 Top10</h4><div id="chart-bili-subscribed-rank" style="height:240px"></div></div>
+            <div class="chart-box" style="height:280px"><h4 style="font-size:13px;margin-bottom:8px;color:#111827">追番 · 状态分布</h4><div id="chart-bili-subscribed-status" style="height:240px"></div></div>
+            <div class="chart-box" style="height:280px"><h4 style="font-size:13px;margin-bottom:4px;color:#111827">追番 · 标签分布</h4><p id="bili-subscribed-tags-hint" class="muted" style="font-size:11px;margin-bottom:4px"></p><div id="chart-bili-subscribed-tags" style="height:220px"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- 个人中心 -->
     <section id="page-user" class="page">
       <div id="user-login-form" class="user-form">
@@ -339,24 +363,6 @@
         <button type="button" id="btn-tag-recommend-refresh" style="margin-bottom:10px">重新获取推荐</button>
         <div id="tag-recommend-list" class="card-list"></div>
         <p id="tag-recommend-msg" class="muted" style="font-size:12px;margin-top:8px;min-height:1.2em"></p>
-        <hr class="hr-light" style="margin:24px 0">
-        <h3 style="margin-bottom:12px;color:#111827">B 站追番列表</h3>
-        <p class="muted" style="font-size:12px;margin-bottom:8px">拉取当前登录的 B 站账号的追番/追剧列表（需已用下方 B 站扫码登录）</p>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:8px">
-          <button id="btn-load-bili-subscribed">加载我的 B 站追番</button>
-          <button id="btn-sync-subscribed" type="button">同步追番到本地数据库</button>
-        </div>
-        <p class="muted" style="font-size:11px;margin-bottom:4px">同步后会将追番的详情（含标签）写入本系统，追番标签分布图会更全面。</p>
-        <div id="bili-subscribed-msg" style="font-size:12px;color:#0369a1;min-height:1.2em;margin-bottom:8px"></div>
-        <div id="bili-subscribed-list" class="card-list"></div>
-        <div id="bili-subscribed-charts" class="hidden" style="margin-top:20px">
-          <h4 style="margin-bottom:12px;font-size:14px;color:#111827">追番数据概览</h4>
-          <div class="chart-row" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">
-            <div class="chart-box" style="height:280px"><h4 style="font-size:13px;margin-bottom:8px;color:#111827">追番 · 播放量 Top10</h4><div id="chart-bili-subscribed-rank" style="height:240px"></div></div>
-            <div class="chart-box" style="height:280px"><h4 style="font-size:13px;margin-bottom:8px;color:#111827">追番 · 状态分布</h4><div id="chart-bili-subscribed-status" style="height:240px"></div></div>
-            <div class="chart-box" style="height:280px"><h4 style="font-size:13px;margin-bottom:4px;color:#111827">追番 · 标签分布</h4><p id="bili-subscribed-tags-hint" class="muted" style="font-size:11px;margin-bottom:4px"></p><div id="chart-bili-subscribed-tags" style="height:220px"></div></div>
-          </div>
-        </div>
         <hr class="hr-light" style="margin:24px 0">
         <h3 style="margin-bottom:12px;color:#111827">爬取数据</h3>
         <p class="muted" style="font-size:12px;margin-bottom:12px">索引与详情请求均会使用您已保存的 B 站 Cookie（若已设置），以登录态请求可降低 412。若仍易触发风控，请调大「间隔」或减少「页数」。</p>

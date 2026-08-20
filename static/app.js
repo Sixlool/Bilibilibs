@@ -46,6 +46,7 @@ function showPage(pageId) {
   updateNavActive(pageId);
   if (pageId === "home") loadList();
   if (pageId === "dashboard") loadDashboard();
+  if (pageId === "subscribed") loadSubscribedPage();
   if (pageId === "user") loadUserPage();
   if (pageId === "admin") loadAdminPage();
 }
@@ -1631,6 +1632,11 @@ function drawBilibiliSubscribedCharts(items) {
     _biliSubscribedCharts.tags = tagsChart;
   }
   setTimeout(() => { rankChart.resize(); statusChart.resize(); }, 80);
+}
+
+function loadSubscribedPage() {
+  // 进入「我的追番」页：确认已登录（未登录跳转由全局初始化处理），加载追番列表
+  loadBilibiliSubscribed();
 }
 
 function loadBilibiliSubscribed() {
