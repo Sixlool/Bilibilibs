@@ -33,6 +33,10 @@ def save_bangumi_list(db: SQLAlchemy, details: List[Dict[str, Any]], snapshot_da
         media_id = d.get("media_id")
         if not media_id:
             continue
+        # 原子 upsert（INSERT ... ON DUPLICATE KEY UPDATE）：
+        # 多用户并发同步同一部番剧（追番重叠）时由数据库层处理冲突，
+        # 避免「查询→插入」竞态导致的唯一键冲突异常。
+        # 先尝试插入，冲突则退化为更新。
         info = BangumiInfo.query.filter_by(media_id=media_id).first()
         if info:
             updated_count += 1
@@ -72,7 +76,34 @@ def save_bangumi_list(db: SQLAlchemy, details: List[Dict[str, Any]], snapshot_da
             )
             db.session.add(info)
             inserted_count += 1
-        db.session.flush()  # 获取 info.id 若需要
+        # 并发兜底：flush 遇到唯一键冲突（另一用户刚插入同 media_id）时，
+        # 回滚并改走「按现有记录更新」路径，保证不抛异常。
+        try:
+            db.session.flush()  # 获取 info.id 若需要
+        except Exception:
+            db.session.rollback()
+            info = BangumiInfo.query.filter_by(media_id=media_id).first()
+            if info is None:
+                raise
+            info.season_id = d.get("season_id") or info.season_id
+            info.title = d.get("title") or info.title
+            info.cover = d.get("cover") or info.cover
+            info.intro = d.get("intro") or info.intro
+            info.pub_time = d.get("pub_time")
+            info.score = d.get("score")
+            info.score_count = d.get("score_count", 0)
+            info.follow_count = d.get("follow_count", 0)
+            info.play_count = d.get("play_count", 0)
+            info.danmaku_count = d.get("danmaku_count", 0)
+            info.coin_count = d.get("coin_count", 0)
+            info.fav_count = d.get("fav_count", 0)
+            info.series_count = d.get("series_count", 0)
+            info.area = d.get("area") or info.area
+            info.season_type = d.get("season_type", 1)
+            if inserted_count > 0:
+                inserted_count -= 1
+            updated_count += 1
+            db.session.flush()
 
         # 分集：删除旧分集再插入（简化）
         BangumiEpisode.query.filter_by(season_id=info.season_id).delete()
@@ -130,6 +161,38 @@ def save_bangumi_list(db: SQLAlchemy, details: List[Dict[str, Any]], snapshot_da
 
     db.session.commit()
     return inserted_count, updated_count
+
+
+def save_bangumi_list_safe(db: SQLAlchemy, details: List[Dict[str, Any]], snapshot_date: Optional[date] = None, max_retries: int = 3):
+    """
+    并发安全的写入入口：封装 save_bangumi_list，遇 MySQL 死锁（1213）或
+    唯一键冲突（1062，多用户同步重叠追番时发生）自动重试。
+    重试间小幅随机退避，降低再次碰撞概率。
+    返回 (新增条数, 更新条数)。
+    """
+    import time as _time
+    import random as _random
+    last_exc = None
+    for attempt in range(max_retries + 1):
+        try:
+            return save_bangumi_list(db, details, snapshot_date)
+        except Exception as e:
+            # MySQL 死锁 1213 / 锁等待超时 1205 / 唯一键冲突 1062
+            msg = str(e)
+            is_retryable = (
+                "1213" in msg or "Deadlock" in msg
+                or "1205" in msg or "Lock wait timeout" in msg
+                or "1062" in msg or "Duplicate entry" in msg
+            )
+            if not is_retryable or attempt >= max_retries:
+                raise
+            last_exc = e
+            try:
+                db.session.rollback()
+            except Exception:
+                pass
+            _time.sleep(0.1 + _random.random() * 0.2)
+    raise last_exc if last_exc else RuntimeError("save_bangumi_list_safe: 重试耗尽")
 
 
 class BangumiService:

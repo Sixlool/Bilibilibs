@@ -701,7 +701,7 @@ def _run_crawl_in_thread(app, user_id, year, season, pages, page_size, delay, se
             from models.user import User
             from models.bangumi import BangumiInfo
             from crawler import BangumiCollector
-            from services.bangumi_service import save_bangumi_list
+            from services.bangumi_service import save_bangumi_list_safe
             credential = None
             if sessdata and bili_jct:
                 try:
@@ -733,7 +733,7 @@ def _run_crawl_in_thread(app, user_id, year, season, pages, page_size, delay, se
                 if n == 0:
                     _status_set(user_id, message="采集完成，共 0 条（可能触发了风控，请调大间隔或减少页数后重试）")
                 else:
-                    inserted, updated = save_bangumi_list(db, details)
+                    inserted, updated = save_bangumi_list_safe(db, details)
                     db.session.commit()
                     total = db.session.query(BangumiInfo).count()
                     _status_set(user_id, message=f"采集完成：本次新增 {inserted} 条、更新 {updated} 条，库中共 {total} 条。请点击「番剧列表」查看。（若想库中条数变多，请爬取不同年份/季度或更多页）")
@@ -757,7 +757,7 @@ def _run_sync_subscribed_in_thread(app, user_id, sessdata, bili_jct, bilibili_ui
             from models import db
             from models.bangumi import BangumiInfo
             from crawler.collector import run_sync_subscribed
-            from services.bangumi_service import save_bangumi_list
+            from services.bangumi_service import save_bangumi_list_safe
             from bilibili_api.utils.network import Credential
 
             credential = None
@@ -781,7 +781,7 @@ def _run_sync_subscribed_in_thread(app, user_id, sessdata, bili_jct, bilibili_ui
                     delay=6.0,
                 )
                 if details:
-                    inserted, updated = save_bangumi_list(db, details)
+                    inserted, updated = save_bangumi_list_safe(db, details)
                     db.session.commit()
                     total = db.session.query(BangumiInfo).count()
                     _status_set(user_id, message=f"同步完成：本次新增 {inserted} 条、更新 {updated} 条，库中共 {total} 条。追番标签分布等图表将更全面。")
@@ -807,7 +807,7 @@ def _run_refresh_one_detail_in_thread(app, user_id, media_id, sessdata, bili_jct
             from models import db
             from models.bangumi import BangumiInfo
             from crawler.collector import run_async, _fetch_one_bangumi_detail
-            from services.bangumi_service import save_bangumi_list
+            from services.bangumi_service import save_bangumi_list_safe
 
             credential = None
             if sessdata and bili_jct:
@@ -830,7 +830,7 @@ def _run_refresh_one_detail_in_thread(app, user_id, media_id, sessdata, bili_jct
                 if not detail:
                     _status_set(user_id, message="拉取失败（网络或风控），请稍后重试；登录 B 站后再试可提高成功率")
                 else:
-                    save_bangumi_list(db, [detail])
+                    save_bangumi_list_safe(db, [detail])
                     db.session.commit()
                     _status_set(user_id, message="详情已更新")
             except Exception as e:
@@ -854,7 +854,7 @@ def _run_refresh_all_in_db_thread(app, user_id, sessdata, bili_jct, delay: float
             from models import db
             from models.bangumi import BangumiInfo
             from crawler.collector import run_async, _fetch_one_bangumi_detail
-            from services.bangumi_service import save_bangumi_list
+            from services.bangumi_service import save_bangumi_list_safe
 
             credential = None
             if sessdata and bili_jct:
@@ -883,7 +883,7 @@ def _run_refresh_all_in_db_thread(app, user_id, sessdata, bili_jct, delay: float
                     try:
                         detail = run_async(_fetch_one_bangumi_detail(info.season_id, info.media_id, credential))
                         if detail:
-                            save_bangumi_list(db, [detail])
+                            save_bangumi_list_safe(db, [detail])
                             db.session.commit()
                             ok += 1
                         else:
