@@ -2,7 +2,8 @@
 """
 系统配置文件
 - 数据库、Redis、Flask 等配置
-- MySQL 账号：root，密码：123456（可按需修改）
+- 所有敏感配置（数据库密码、SECRET_KEY 等）通过环境变量 / .env 注入，
+  生产环境（FLASK_ENV=production）强制要求显式配置，不提供默认弱口令。
 """
 
 import os

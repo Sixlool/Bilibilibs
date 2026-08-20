@@ -1,11 +1,27 @@
+# 环境与凭据（切勿提交）
 .env
+*.env.local
+credentials*.yaml
+*.pem
+*.key
+
+# Python
 .venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
+
+# 日志与运行产物
 *.log
-.idea/
-.vscode/
+logs/
+nohup.out
 *.sqlite3
 *.db
-Thumbs.db
 
+# 编辑器
+.idea/
+.vscode/
+
+# 系统
+Thumbs.db
+.DS_Store

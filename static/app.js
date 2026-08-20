@@ -185,7 +185,7 @@ function loadList() {
     .catch(err => {
       document.getElementById("list-result").innerHTML =
         "<p class='error'>" + escapeHtml(err.message) + "</p>" +
-        "<p style='color:#1f2937;font-size:12px;margin-top:8px'>请确认 run.py 已启动且与采集时使用同一 MySQL 数据库（config 中 root/123456、bilibili_bangumi）。</p>";
+        "<p style='color:#1f2937;font-size:12px;margin-top:8px'>请确认服务已启动且与采集时使用同一 MySQL 数据库（数据库名见 .env 配置）。</p>";
     });
 }
 
