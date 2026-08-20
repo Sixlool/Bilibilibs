@@ -1697,14 +1697,14 @@ function loadBilibiliSubscribed() {
     .catch(() => { msgEl.textContent = "请求失败"; });
 }
 
-document.getElementById("btn-load-bili-subscribed").addEventListener("click", loadBilibiliSubscribed);
+document.getElementById("btn-load-bili-subscribed")?.addEventListener("click", loadBilibiliSubscribed);
 
 const btnTagRecRefresh = document.getElementById("btn-tag-recommend-refresh");
 if (btnTagRecRefresh) {
   btnTagRecRefresh.addEventListener("click", () => loadTagRecommendations());
 }
 
-document.getElementById("btn-sync-subscribed").addEventListener("click", () => {
+document.getElementById("btn-sync-subscribed")?.addEventListener("click", () => {
   const msgEl = document.getElementById("bili-subscribed-msg");
   if (!msgEl) return;
   msgEl.textContent = "正在启动同步…";
