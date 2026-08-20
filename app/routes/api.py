@@ -576,6 +576,9 @@ def bilibili_qr_poll():
             if "cryptography" in emsg and "caching_sha2_password" in emsg:
                 emsg = "数据库驱动缺少 cryptography 依赖，无法保存扫码登录结果"
             return jsonify({"ok": False, "status": "error", "error": emsg}), 500
+    if status == "error":
+        # B 站已确认登录但未拿到完整凭据（新版接口可能变更），给出准确提示而非「二维码已过期」
+        return jsonify({"ok": False, "status": "error", "error": "已确认登录，但获取登录凭据失败，请点击「显示登录二维码」重试"}), 502
     return jsonify({"ok": True, "status": status})
 
 
