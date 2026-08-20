@@ -549,14 +549,14 @@ def bilibili_qr_poll():
                     bilibili_uid = None
             if bilibili_uid is not None:
                 u = User.query.filter_by(bilibili_uid=bilibili_uid).first()
-            if u is not None:
-                # 已绑定：更新 Cookie 并登录
+            if u is not None and not getattr(u, "is_auto_created", False):
+                # 已绑定（真实账号）：更新 Cookie 并登录
                 u.bilibili_sessdata = sessdata
                 u.bilibili_bili_jct = bili_jct
                 db.session.commit()
                 login_user(u)
                 return jsonify({"ok": True, "status": "done", "message": "登录成功", "user": {"id": u.id, "username": u.username}})
-            # 未绑定：暂存凭据，返回绑定 token 引导注册/绑定
+            # 未绑定（含自动创建的历史账号）：暂存凭据，返回绑定 token 引导注册/绑定
             bind_token = _create_bind_token(sessdata, bili_jct, bilibili_uid)
             return jsonify({
                 "ok": True,

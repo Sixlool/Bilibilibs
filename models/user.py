@@ -20,6 +20,9 @@ class User(UserMixin, db.Model):
     bilibili_bili_jct = db.Column(db.String(256), default="")
     # 是否管理员（可进入后台管理界面，执行数据采集等管理操作）
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
+    # 是否扫码自动创建的临时账号（旧版行为，未绑定真实用户名密码）。
+    # 此类账号扫码时仍走绑定流程，不算「已绑定」。
+    is_auto_created = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

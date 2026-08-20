@@ -94,7 +94,9 @@ def bind():
     bili_jct = rec.get("bili_jct") or ""
     bilibili_uid = rec.get("bilibili_uid")
 
-    # 该 B 站账号若已绑定其他用户，拒绝重复绑定
+    # 该 B 站账号若已绑定其他「真实」用户，拒绝重复绑定；
+    # 若挂在扫码自动创建的临时账号上，允许接管（把 UID 让渡给正在绑定的账号）。
+    auto_user = None
     if bilibili_uid is not None:
         try:
             bilibili_uid = int(bilibili_uid)
@@ -102,29 +104,50 @@ def bind():
             bilibili_uid = None
         if bilibili_uid is not None:
             exist = User.query.filter_by(bilibili_uid=bilibili_uid).first()
-            if exist:
+            if exist and not getattr(exist, "is_auto_created", False):
                 return jsonify({"ok": False, "error": f"该 B 站账号已绑定用户「{exist.username}」，请直接用该账号登录"}), 409
+            if exist and getattr(exist, "is_auto_created", False):
+                auto_user = exist
 
     if mode == "register":
         if User.query.filter_by(username=username).first():
             return jsonify({"ok": False, "error": "username exists"}), 400
-        user = User(
-            username=username,
-            password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
-            email=email,
-            bilibili_uid=bilibili_uid,
-            bilibili_sessdata=sessdata,
-            bilibili_bili_jct=bili_jct,
-        )
-        # 首个管理员引导
-        import os
-        admin_username = (os.getenv("ADMIN_USERNAME") or "").strip()
-        if admin_username and username == admin_username:
-            admin_exists = User.query.filter(User.is_admin == True).first()  # noqa: E712
-            if not admin_exists:
-                user.is_admin = True
-        db.session.add(user)
-        db.session.commit()
+        # 接管自动创建的临时账号：复用其记录（保留收藏等数据），换成真实用户名密码并解绑 UID
+        if auto_user is not None:
+            auto_user.username = username
+            auto_user.password_hash = generate_password_hash(password, method="pbkdf2:sha256")
+            auto_user.email = email
+            auto_user.bilibili_uid = bilibili_uid
+            auto_user.bilibili_sessdata = sessdata
+            auto_user.bilibili_bili_jct = bili_jct
+            auto_user.is_auto_created = False
+            user = auto_user
+            # 首个管理员引导
+            import os
+            admin_username = (os.getenv("ADMIN_USERNAME") or "").strip()
+            if admin_username and username == admin_username:
+                admin_exists = User.query.filter(User.is_admin == True).first()  # noqa: E712
+                if not admin_exists:
+                    user.is_admin = True
+            db.session.commit()
+        else:
+            user = User(
+                username=username,
+                password_hash=generate_password_hash(password, method="pbkdf2:sha256"),
+                email=email,
+                bilibili_uid=bilibili_uid,
+                bilibili_sessdata=sessdata,
+                bilibili_bili_jct=bili_jct,
+            )
+            # 首个管理员引导
+            import os
+            admin_username = (os.getenv("ADMIN_USERNAME") or "").strip()
+            if admin_username and username == admin_username:
+                admin_exists = User.query.filter(User.is_admin == True).first()  # noqa: E712
+                if not admin_exists:
+                    user.is_admin = True
+            db.session.add(user)
+            db.session.commit()
     else:
         # 绑定已有账号：校验账号密码
         user = User.query.filter_by(username=username).first()
@@ -132,6 +155,15 @@ def bind():
             return jsonify({"ok": False, "error": "invalid username or password"}), 401
         if user.bilibili_uid is not None and user.bilibili_uid != bilibili_uid:
             return jsonify({"ok": False, "error": "该账号已绑定其他 B 站账号"}), 409
+        # 若该 B 站 UID 挂在自动创建账号上，接管：删除临时账号（其收藏迁移到当前账号）
+        if auto_user is not None and auto_user.id != user.id:
+            from models.user import UserFavorite
+            favs = UserFavorite.query.filter_by(user_id=auto_user.id).all()
+            for f in favs:
+                if not UserFavorite.query.filter_by(user_id=user.id, media_id=f.media_id).first():
+                    f.user_id = user.id
+                    db.session.add(f)
+            db.session.delete(auto_user)
         user.bilibili_uid = bilibili_uid
         user.bilibili_sessdata = sessdata
         user.bilibili_bili_jct = bili_jct
