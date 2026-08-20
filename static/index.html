@@ -170,6 +170,26 @@
     .hr-light { border: none; border-top: 1px solid #e5e7eb; }
     .panel-soft { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; }
 
+    /* 采集进度条 */
+    .crawl-progress-wrap { display: none; margin: 10px 0 12px; }
+    .crawl-progress-track {
+      height: 8px; background: #e5e7eb; border-radius: 999px; overflow: hidden;
+    }
+    .crawl-progress-bar {
+      height: 100%; width: 0%; border-radius: 999px;
+      background: linear-gradient(90deg, #22c55e, #16a34a);
+      transition: width .4s ease;
+    }
+    .crawl-progress-bar.indeterminate {
+      width: 40% !important;
+      animation: crawlIndeterminate 1.2s ease-in-out infinite;
+    }
+    @keyframes crawlIndeterminate {
+      0% { margin-left: -40%; } 100% { margin-left: 100%; }
+    }
+    .crawl-progress-text { font-size: 12px; color: #0369a1; margin-top: 6px; min-height: 1.2em; }
+    .crawl-progress-pct { font-size: 11px; color: #6b7280; margin-left: 6px; }
+
     /* B 站扫码：点击按钮后以弹层展示二维码（遮罩 + 居中卡片） */
     .bili-qr-modal {
       position: fixed;
@@ -249,7 +269,10 @@
           <button type="button" id="btn-refresh-all-in-db" title="依次重新拉取数据库中已有番剧的详情，条目多时耗时较长">更新库内番剧信息</button>
         </div>
       </div>
-      <p id="list-crawl-msg" class="muted" style="font-size:12px;margin-bottom:12px;min-height:1.2em;color:#0369a1;display:none"></p>
+      <div id="list-crawl-progress" class="crawl-progress-wrap" style="margin-bottom:12px">
+        <div class="crawl-progress-track"><div id="list-crawl-progress-bar" class="crawl-progress-bar"></div></div>
+        <div class="crawl-progress-text" id="list-crawl-msg"></div>
+      </div>
       <div id="list-result" class="card-list"></div>
       <div id="pagination" class="pagination"></div>
     </section>
@@ -377,7 +400,10 @@
           <button id="btn-crawl-start">开始采集</button>
         </div>
         <p class="muted" style="font-size:11px;margin-bottom:8px">页数：拉取多少页列表（每页约 20 条）；间隔：每次请求间隔秒数，建议 3～5。采集完成后请点击顶部「番剧列表」查看；若进度显示共 0 条多为触发风控，可调大间隔或减少页数后重试。</p>
-        <div id="crawl-msg" style="font-size:12px;color:#0369a1;min-height:1.2em"></div>
+        <div id="crawl-progress" class="crawl-progress-wrap">
+          <div class="crawl-progress-track"><div id="crawl-progress-bar" class="crawl-progress-bar"></div></div>
+          <div class="crawl-progress-text" id="crawl-msg"></div>
+        </div>
         <hr class="hr-light" style="margin:24px 0">
         <h3 style="margin-bottom:12px;color:#111827">B站账号绑定</h3>
         <div id="bili-bind-status" style="font-size:12px;margin-bottom:10px;min-height:1.4em"></div>
@@ -460,7 +486,10 @@
           <button id="admin-btn-refresh-db" type="button" title="依次重新拉取数据库中已有番剧的详情，条目多时耗时较长">更新库内番剧信息</button>
           <button id="admin-btn-sync-subscribed" type="button" title="把管理员 B 站账号的追番列表同步到本地数据库">同步我的追番</button>
         </div>
-        <p id="admin-crawl-msg" style="font-size:12px;color:#0369a1;min-height:1.2em"></p>
+        <div id="admin-crawl-progress" class="crawl-progress-wrap">
+          <div class="crawl-progress-track"><div id="admin-crawl-progress-bar" class="crawl-progress-bar"></div></div>
+          <div class="crawl-progress-text" id="admin-crawl-msg"></div>
+        </div>
       </div>
 
       <div class="panel-soft" style="padding:18px;margin-bottom:16px">

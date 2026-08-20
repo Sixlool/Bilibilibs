@@ -640,8 +640,55 @@ def _consume_bind_token(token):
     return rec
 
 
-# 当前用户采集进度（user_id -> { running, page, pages, items, message }），供前端轮询
-_crawl_status = {}
+# 当前用户采集进度（存数据库，多 worker 共享；前端轮询 /crawl/status 或 /admin/crawl/status）
+
+
+def _status_get(user_id):
+    """读取采集进度（数据库）；无记录返回空 dict"""
+    from models.user import CrawlStatus
+    try:
+        s = CrawlStatus.query.filter_by(user_id=user_id).first()
+        if s is None:
+            return {}
+        return {
+            "running": bool(s.running),
+            "job": s.job or "",
+            "detail_media_id": s.detail_media_id,
+            "page": s.page or 0,
+            "pages": s.pages or 0,
+            "items": s.items or 0,
+            "message": s.message or "",
+        }
+    except Exception:
+        return {}
+
+
+def _status_set(user_id, running=None, job=None, detail_media_id=None,
+                page=None, pages=None, items=None, message=None):
+    """写入采集进度（数据库 upsert）"""
+    from models.user import CrawlStatus
+    try:
+        s = CrawlStatus.query.filter_by(user_id=user_id).first()
+        if s is None:
+            s = CrawlStatus(user_id=user_id)
+            db.session.add(s)
+        if running is not None:
+            s.running = bool(running)
+        if job is not None:
+            s.job = job or ""
+        if detail_media_id is not None:
+            s.detail_media_id = detail_media_id
+        if page is not None:
+            s.page = page or 0
+        if pages is not None:
+            s.pages = pages or 0
+        if items is not None:
+            s.items = items or 0
+        if message is not None:
+            s.message = (message or "")[:500]
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
 
 
 def _run_crawl_in_thread(app, user_id, year, season, pages, page_size, delay, sessdata, bili_jct):
@@ -662,26 +709,14 @@ def _run_crawl_in_thread(app, user_id, year, season, pages, page_size, delay, se
                     credential = Credential(sessdata=sessdata, bili_jct=bili_jct)
                 except Exception:
                     pass
-            status = _crawl_status.get(user_id) or {}
-            status["running"] = True
-            status["job"] = "index"
-            status["detail_media_id"] = None
-            status["page"] = 0
-            status["pages"] = pages or 2
-            status["items"] = 0
-            ytxt = str(year) if year is not None else "不限"
-            stxt = str(season) if season in (1, 4, 7, 10) else "不限"
-            status["message"] = f"正在启动…（年份：{ytxt}，季度：{stxt}）"
-            _crawl_status[user_id] = status
+            status = _status_get(user_id)
+            _status_set(user_id, running=True, job="index", detail_media_id=None,
+                        page=0, pages=pages or 2, items=0,
+                        message=f"正在启动…（年份：{str(year) if year is not None else '不限'}，季度：{str(season) if season in (1, 4, 7, 10) else '不限'}）")
 
             def progress_cb(current_page, max_pages, items_count, message):
-                s = _crawl_status.get(user_id)
-                if s is None:
-                    return
-                s["page"] = current_page
-                s["pages"] = max_pages
-                s["items"] = items_count
-                s["message"] = message
+                _status_set(user_id, page=current_page, pages=max_pages,
+                            items=items_count, message=message)
 
             details = []
             try:
@@ -696,18 +731,17 @@ def _run_crawl_in_thread(app, user_id, year, season, pages, page_size, delay, se
                 )
                 n = len(details)
                 if n == 0:
-                    status["message"] = "采集完成，共 0 条（可能触发了风控，请调大间隔或减少页数后重试）"
+                    _status_set(user_id, message="采集完成，共 0 条（可能触发了风控，请调大间隔或减少页数后重试）")
                 else:
                     inserted, updated = save_bangumi_list(db, details)
                     db.session.commit()
                     total = db.session.query(BangumiInfo).count()
-                    status["message"] = f"采集完成：本次新增 {inserted} 条、更新 {updated} 条，库中共 {total} 条。请点击「番剧列表」查看。（若想库中条数变多，请爬取不同年份/季度或更多页）"
+                    _status_set(user_id, message=f"采集完成：本次新增 {inserted} 条、更新 {updated} 条，库中共 {total} 条。请点击「番剧列表」查看。（若想库中条数变多，请爬取不同年份/季度或更多页）")
             except Exception as e:
                 log.exception("采集或写入数据库失败")
-                status["message"] = f"写入数据库失败：{e!s}"
+                _status_set(user_id, message=f"写入数据库失败：{e!s}")
             finally:
-                status["running"] = False
-                status["items"] = len(details)
+                _status_set(user_id, running=False, items=len(details))
                 try:
                     db.session.remove()
                 except Exception:
@@ -732,21 +766,11 @@ def _run_sync_subscribed_in_thread(app, user_id, sessdata, bili_jct, bilibili_ui
                     credential = Credential(sessdata=sessdata, bili_jct=bili_jct)
                 except Exception:
                     pass
-            status = _crawl_status.get(user_id) or {}
-            status["running"] = True
-            status["job"] = "sync_subscribed"
-            status["detail_media_id"] = None
-            status["page"] = 0
-            status["pages"] = 1
-            status["items"] = 0
-            status["message"] = "正在拉取追番列表…"
-            _crawl_status[user_id] = status
+            _status_set(user_id, running=True, job="sync_subscribed", detail_media_id=None,
+                        page=0, pages=1, items=0, message="正在拉取追番列表…")
 
             def progress_cb(_page, _pages, count, message):
-                s = _crawl_status.get(user_id)
-                if s:
-                    s["items"] = count
-                    s["message"] = message
+                _status_set(user_id, items=count, message=message)
 
             details = []
             try:
@@ -760,15 +784,14 @@ def _run_sync_subscribed_in_thread(app, user_id, sessdata, bili_jct, bilibili_ui
                     inserted, updated = save_bangumi_list(db, details)
                     db.session.commit()
                     total = db.session.query(BangumiInfo).count()
-                    status["message"] = f"同步完成：本次新增 {inserted} 条、更新 {updated} 条，库中共 {total} 条。追番标签分布等图表将更全面。"
+                    _status_set(user_id, message=f"同步完成：本次新增 {inserted} 条、更新 {updated} 条，库中共 {total} 条。追番标签分布等图表将更全面。")
                 else:
-                    status["message"] = "同步完成，共 0 条（请确认已用 B 站扫码登录且账号有追番）"
+                    _status_set(user_id, message="同步完成，共 0 条（请确认已用 B 站扫码登录且账号有追番）")
             except Exception as e:
                 log.exception("同步追番失败")
-                status["message"] = f"同步失败：{e!s}"
+                _status_set(user_id, message=f"同步失败：{e!s}")
             finally:
-                status["running"] = False
-                status["items"] = len(details)
+                _status_set(user_id, running=False, items=len(details))
                 try:
                     db.session.remove()
                 except Exception:
@@ -794,35 +817,27 @@ def _run_refresh_one_detail_in_thread(app, user_id, media_id, sessdata, bili_jct
                 except Exception:
                     pass
 
-            status = _crawl_status.get(user_id) or {}
-            status["running"] = True
-            status["job"] = "detail"
-            status["detail_media_id"] = media_id
-            status["page"] = 0
-            status["pages"] = 1
-            status["items"] = 1
-            status["message"] = f"正在重新拉取该番详情（media_id={media_id}）…"
-            _crawl_status[user_id] = status
+            _status_set(user_id, running=True, job="detail", detail_media_id=media_id,
+                        page=0, pages=1, items=1,
+                        message=f"正在重新拉取该番详情（media_id={media_id}）…")
 
             try:
                 info = BangumiInfo.query.filter_by(media_id=media_id).first()
                 if not info:
-                    status["message"] = "库中未找到该番剧"
+                    _status_set(user_id, message="库中未找到该番剧")
                     return
                 detail = run_async(_fetch_one_bangumi_detail(info.season_id, media_id, credential))
                 if not detail:
-                    status["message"] = "拉取失败（网络或风控），请稍后重试；登录 B 站后再试可提高成功率"
+                    _status_set(user_id, message="拉取失败（网络或风控），请稍后重试；登录 B 站后再试可提高成功率")
                 else:
                     save_bangumi_list(db, [detail])
                     db.session.commit()
-                    status["message"] = "详情已更新"
+                    _status_set(user_id, message="详情已更新")
             except Exception as e:
                 log.exception("单番详情刷新失败 media_id=%s", media_id)
-                status["message"] = f"写入失败：{e!s}"
+                _status_set(user_id, message=f"写入失败：{e!s}")
             finally:
-                status["running"] = False
-                status["job"] = ""
-                status["detail_media_id"] = None
+                _status_set(user_id, running=False, job="", detail_media_id=None)
                 try:
                     db.session.remove()
                 except Exception:
@@ -851,28 +866,20 @@ def _run_refresh_all_in_db_thread(app, user_id, sessdata, bili_jct, delay: float
 
             rows = BangumiInfo.query.order_by(BangumiInfo.media_id.asc()).all()
             total = len(rows)
-            status = _crawl_status.get(user_id) or {}
-            status["running"] = True
-            status["job"] = "refresh_db"
-            status["detail_media_id"] = None
-            status["page"] = 0
-            status["pages"] = max(1, total) if total else 1
-            status["items"] = 0
-            status["message"] = f"准备更新库内番剧详情，共 {total} 条…"
-            _crawl_status[user_id] = status
+            _status_set(user_id, running=True, job="refresh_db", detail_media_id=None,
+                        page=0, pages=max(1, total) if total else 1, items=0,
+                        message=f"准备更新库内番剧详情，共 {total} 条…")
 
             ok = 0
             fail = 0
             try:
                 if total == 0:
-                    status["message"] = "库中暂无番剧记录"
+                    _status_set(user_id, message="库中暂无番剧记录")
                     return
                 for i, info in enumerate(rows):
-                    status["page"] = i + 1
-                    status["pages"] = total
                     short_title = (info.title or "")[:28]
-                    status["message"] = f"更新中 {i + 1}/{total}：{short_title or '(无标题)'}"
-                    _crawl_status[user_id] = status
+                    _status_set(user_id, page=i + 1, pages=total,
+                                message=f"更新中 {i + 1}/{total}：{short_title or '(无标题)'}")
                     try:
                         detail = run_async(_fetch_one_bangumi_detail(info.season_id, info.media_id, credential))
                         if detail:
@@ -888,19 +895,16 @@ def _run_refresh_all_in_db_thread(app, user_id, sessdata, bili_jct, delay: float
                             db.session.rollback()
                         except Exception:
                             pass
-                    status["items"] = ok
-                    _crawl_status[user_id] = status
+                    _status_set(user_id, items=ok)
                     if i + 1 < total:
                         time.sleep(delay)
-                status["message"] = f"库内番剧详情更新结束：成功 {ok} 条，失败或未拉到 {fail} 条。"
+                _status_set(user_id, message=f"库内番剧详情更新结束：成功 {ok} 条，失败或未拉到 {fail} 条。")
             except Exception as e:
                 log.exception("批量刷新库内番剧失败")
-                status["message"] = f"批量更新中断：{e!s}"
+                _status_set(user_id, message=f"批量更新中断：{e!s}")
             finally:
-                status["running"] = False
-                status["job"] = ""
-                status["pages"] = total if total else 1
-                status["page"] = total if total else 0
+                _status_set(user_id, running=False, job="",
+                            pages=total if total else 1, page=total if total else 0)
                 try:
                     db.session.remove()
                 except Exception:
@@ -947,7 +951,7 @@ def crawl_refresh_detail():
         return jsonify({"ok": False, "error": "库中未找到该番剧"}), 404
 
     uid = current_user.id
-    s = _crawl_status.get(uid)
+    s = _status_get(uid)
     if s and s.get("running"):
         return jsonify({"ok": False, "error": "已有采集任务进行中，请等待结束后再试"}), 409
 
@@ -955,16 +959,9 @@ def crawl_refresh_detail():
     sessdata = (u.bilibili_sessdata or "").strip() if u else ""
     bili_jct = (u.bilibili_bili_jct or "").strip() if u else ""
     # 先写入状态，便于前端立刻轮询到 running=true（避免任务过快结束漏检）
-    _crawl_status[uid] = {
-        **(s or {}),
-        "running": True,
-        "job": "detail",
-        "detail_media_id": media_id,
-        "page": 0,
-        "pages": 1,
-        "items": 1,
-        "message": f"正在重新拉取该番详情（media_id={media_id}）…",
-    }
+    _status_set(uid, running=True, job="detail", detail_media_id=media_id,
+                page=0, pages=1, items=1,
+                message=f"正在重新拉取该番详情（media_id={media_id}）…")
     app = current_app._get_current_object()
     thread = threading.Thread(
         target=_run_refresh_one_detail_in_thread,
@@ -988,7 +985,7 @@ def crawl_refresh_in_db():
     from models.bangumi import BangumiInfo
 
     uid = current_user.id
-    s = _crawl_status.get(uid)
+    s = _status_get(uid)
     if s and s.get("running"):
         return jsonify({"ok": False, "error": "已有采集任务进行中，请等待结束后再试"}), 409
 
@@ -1001,16 +998,9 @@ def crawl_refresh_in_db():
     sessdata = (u.bilibili_sessdata or "").strip() if u else ""
     bili_jct = (u.bilibili_bili_jct or "").strip() if u else ""
 
-    _crawl_status[uid] = {
-        **(s or {}),
-        "running": True,
-        "job": "refresh_db",
-        "detail_media_id": None,
-        "page": 0,
-        "pages": max(1, total) if total else 1,
-        "items": 0,
-        "message": f"任务已排队：将更新库内共 {total} 条番剧（每条间隔约 {delay:g}s）…",
-    }
+    _status_set(uid, running=True, job="refresh_db", detail_media_id=None,
+                page=0, pages=max(1, total) if total else 1, items=0,
+                message=f"任务已排队：将更新库内共 {total} 条番剧（每条间隔约 {delay:g}s）…")
     app = current_app._get_current_object()
     thread = threading.Thread(
         target=_run_refresh_all_in_db_thread,
@@ -1074,7 +1064,7 @@ def crawl_start():
 @login_required
 def crawl_status():
     """当前用户最近一次采集进度（供前端轮询）"""
-    s = _crawl_status.get(current_user.id) or {}
+    s = _status_get(current_user.id)
     return jsonify({
         "ok": True,
         "running": bool(s.get("running")),

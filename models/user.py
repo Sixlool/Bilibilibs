@@ -37,3 +37,18 @@ class UserFavorite(db.Model):
     media_id = db.Column(db.Integer, nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     __table_args__ = (db.UniqueConstraint("user_id", "media_id", name="uk_user_media"),)
+
+
+class CrawlStatus(db.Model):
+    """采集进度（多 worker 共享，存数据库避免进程内存不共享）"""
+    __tablename__ = "crawl_status"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, nullable=False, unique=True, index=True)
+    running = db.Column(db.Boolean, default=False, nullable=False)
+    job = db.Column(db.String(32), default="")
+    detail_media_id = db.Column(db.Integer, nullable=True)
+    page = db.Column(db.Integer, default=0)
+    pages = db.Column(db.Integer, default=0)
+    items = db.Column(db.Integer, default=0)
+    message = db.Column(db.String(512), default="")
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

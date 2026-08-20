@@ -237,8 +237,11 @@ function applyDashboardLinkToList(opts) {
 document.getElementById("btn-refresh-all-in-db").addEventListener("click", () => {
   if (!confirm("将按顺序重新拉取数据库中已有番剧的详情（简介、播放量、分集等）。条目越多耗时越长，且勿与个人中心其它采集同时进行。确定开始？")) return;
   const msg = document.getElementById("list-crawl-msg");
+  const wrap = document.getElementById("list-crawl-progress");
+  const bar = document.getElementById("list-crawl-progress-bar");
   const btn = document.getElementById("btn-refresh-all-in-db");
-  msg.style.display = "block";
+  wrap.style.display = "block";
+  bar.classList.add("indeterminate");
   msg.textContent = "正在提交…";
   btn.disabled = true;
   fetch(`${API_BASE}/crawl/refresh-in-db`, {
@@ -251,12 +254,14 @@ document.getElementById("btn-refresh-all-in-db").addEventListener("click", () =>
     .then(({ ok, status, body }) => {
       if (status === 409 || !ok) {
         btn.disabled = false;
+        wrap.style.display = "none";
         msg.textContent = body.error || body.message || "请求失败";
         return;
       }
       window.__listBulkRefreshPending = true;
+      bar.classList.remove("indeterminate");
       msg.textContent = (body.message || "已开始") + (body.using_bilibili_cookie ? "（已使用 B 站 Cookie）" : "（未检测到 Cookie，若频繁失败请先在个人中心扫码登录）");
-      pollCrawlStatus(msg);
+      pollCrawlStatus(null, { wrap: "list-crawl-progress", bar: "list-crawl-progress-bar", msg: "list-crawl-msg" });
     })
     .catch(() => {
       btn.disabled = false;
@@ -1151,29 +1156,69 @@ window.__listBulkRefreshPending = false;
 function stopCrawlStatusPoll() {
   if (crawlStatusTimer) { clearInterval(crawlStatusTimer); crawlStatusTimer = null; }
 }
-function pollCrawlStatus(msgEl) {
+/**
+ * 统一渲染采集进度条。
+ * res: /crawl/status 或 /admin/crawl/status 的返回
+ * targets: { wrap, bar, msg, extraLink? } 对应的 DOM id 前缀
+ */
+function renderCrawlProgress(res, targets) {
+  const wrap = document.getElementById(targets.wrap);
+  const bar = document.getElementById(targets.bar);
+  const msg = document.getElementById(targets.msg);
+  if (!wrap || !bar || !msg) return;
+  if (res.running) {
+    wrap.style.display = "block";
+    const pages = res.pages || 0;
+    const page = res.page || 0;
+    if (pages > 1) {
+      bar.classList.remove("indeterminate");
+      const pct = Math.min(100, Math.round((page / pages) * 100));
+      bar.style.width = pct + "%";
+      msg.textContent = (res.message || "") + `（${page}/${pages}）`;
+    } else {
+      bar.classList.add("indeterminate");
+      msg.textContent = res.message || "采集中…";
+    }
+  } else {
+    wrap.style.display = "block";
+    bar.classList.remove("indeterminate");
+    bar.style.width = "100%";
+    if (res.job) {
+      // 完成态：保持进度条满格，展示结果消息
+      msg.innerHTML = (res.message || "完成") + (res.items > 0 && targets.extraLink ? targets.extraLink : "");
+    } else {
+      // 无任务记录：隐藏进度条
+      wrap.style.display = "none";
+      msg.textContent = "";
+    }
+  }
+}
+
+function pollCrawlStatus(msgEl, targets) {
   stopCrawlStatusPoll();
+  const t = targets || { wrap: "list-crawl-progress", bar: "list-crawl-progress-bar", msg: "list-crawl-msg" };
   crawlStatusTimer = setInterval(() => {
     fetch(`${API_BASE}/crawl/status`, { credentials: "include" })
       .then(r => r.json())
       .then(res => {
         if (!res.ok) return;
-        if (msgEl) {
-          if (res.running) {
-            msgEl.textContent = res.message || "";
-          } else {
-            msgEl.innerHTML = (res.message || "") + (res.items > 0 ? ' <a href="#" id="crawl-goto-list" style="color:#0369a1;margin-left:6px">去番剧列表</a>' : "");
-            const link = document.getElementById("crawl-goto-list");
-            if (link) link.addEventListener("click", function(e) {
-              e.preventDefault();
-              document.getElementById("search-year").value = "";
-              document.getElementById("search-season").value = "";
-              showPage("home");
-              loadList();
-            });
-          }
-        }
-        if (!res.running) {
+        if (res.running) {
+          renderCrawlProgress(res, t);
+        } else {
+          // 完成态：构建「去番剧列表」链接（仅列表页用）
+          const link = res.items > 0 ? ' <a href="#" id="crawl-goto-list" style="color:#0369a1;margin-left:6px">去番剧列表</a>' : "";
+          renderCrawlProgress({ ...res, job: res.job || "done" }, {
+            ...t,
+            extraLink: link,
+          });
+          const el = document.getElementById("crawl-goto-list");
+          if (el) el.addEventListener("click", function(e) {
+            e.preventDefault();
+            document.getElementById("search-year").value = "";
+            document.getElementById("search-season").value = "";
+            showPage("home");
+            loadList();
+          });
           stopCrawlStatusPoll();
           if (window.__listBulkRefreshPending) {
             window.__listBulkRefreshPending = false;
@@ -1193,6 +1238,10 @@ document.getElementById("btn-crawl-start").addEventListener("click", () => {
   const pages = parseInt(document.getElementById("crawl-pages").value, 10) || 2;
   const delay = parseFloat(document.getElementById("crawl-delay").value) || 3;
   const msg = document.getElementById("crawl-msg");
+  const wrap = document.getElementById("crawl-progress");
+  const bar = document.getElementById("crawl-progress-bar");
+  wrap.style.display = "block";
+  bar.classList.add("indeterminate");
   msg.textContent = "正在启动采集…";
   fetch(`${API_BASE}/crawl/start`, {
     method: "POST",
@@ -1204,7 +1253,7 @@ document.getElementById("btn-crawl-start").addEventListener("click", () => {
     .then(res => {
       msg.textContent = res.message || "已提交";
       if (res.using_bilibili_cookie) msg.textContent += "（使用 B 站 Cookie）";
-      pollCrawlStatus(msg);
+      pollCrawlStatus(msg, { wrap: "crawl-progress", bar: "crawl-progress-bar", msg: "crawl-msg" });
     })
     .catch(() => { msg.textContent = "请求失败"; });
 });
@@ -1742,7 +1791,7 @@ function adminPollCrawlStatus(msgEl) {
       .then(r => r.json())
       .then(res => {
         if (!res.ok) return;
-        if (msgEl) msgEl.textContent = res.message || (res.running ? "采集进行中…" : "");
+        renderCrawlProgress(res, { wrap: "admin-crawl-progress", bar: "admin-crawl-progress-bar", msg: "admin-crawl-msg" });
         if (!res.running) {
           stopAdminCrawlPoll();
           document.getElementById("admin-btn-crawl-start").disabled = false;
@@ -1774,14 +1823,13 @@ function loadAdminOverview() {
       el.innerHTML = items.map(([k, v]) =>
         `<span style="background:#f1f5f9;border-radius:6px;padding:8px 14px"><b>${k}</b><br><span style="font-size:18px">${v}</span></span>`
       ).join("");
-      // 采集状态显示
-      const msg = document.getElementById("admin-crawl-msg");
-      if (res.crawl && res.crawl.message) msg.textContent = res.crawl.message;
+      // 采集状态显示（若有任务运行中，进入页面即显示进度条并轮询）
       if (res.crawl && res.crawl.running) {
         document.getElementById("admin-btn-crawl-start").disabled = true;
         document.getElementById("admin-btn-refresh-db").disabled = true;
         document.getElementById("admin-btn-sync-subscribed").disabled = true;
-        adminPollCrawlStatus(msg);
+        renderCrawlProgress(res.crawl, { wrap: "admin-crawl-progress", bar: "admin-crawl-progress-bar", msg: "admin-crawl-msg" });
+        adminPollCrawlStatus(document.getElementById("admin-crawl-msg"));
       }
     })
     .catch(() => {});
@@ -1858,6 +1906,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const pages = parseInt(document.getElementById("admin-crawl-pages").value, 10) || 2;
     const delay = parseFloat(document.getElementById("admin-crawl-delay").value) || 3;
     const msg = document.getElementById("admin-crawl-msg");
+    const bar = document.getElementById("admin-crawl-progress-bar");
+    document.getElementById("admin-crawl-progress").style.display = "block";
+    bar.classList.add("indeterminate");
     msg.textContent = "正在启动采集…";
     btnStart.disabled = true;
     fetch(`/admin/crawl/start`, {
@@ -1882,6 +1933,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnRefresh = document.getElementById("admin-btn-refresh-db");
   if (btnRefresh) btnRefresh.addEventListener("click", () => {
     const msg = document.getElementById("admin-crawl-msg");
+    const bar = document.getElementById("admin-crawl-progress-bar");
+    document.getElementById("admin-crawl-progress").style.display = "block";
+    bar.classList.add("indeterminate");
     msg.textContent = "正在启动库内更新…";
     btnRefresh.disabled = true;
     fetch(`/admin/crawl/refresh-in-db`, {
@@ -1902,6 +1956,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnSync = document.getElementById("admin-btn-sync-subscribed");
   if (btnSync) btnSync.addEventListener("click", () => {
     const msg = document.getElementById("admin-crawl-msg");
+    const bar = document.getElementById("admin-crawl-progress-bar");
+    document.getElementById("admin-crawl-progress").style.display = "block";
+    bar.classList.add("indeterminate");
     msg.textContent = "正在启动追番同步…";
     btnSync.disabled = true;
     fetch(`/admin/crawl/sync-subscribed`, {

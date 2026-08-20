@@ -13,9 +13,10 @@ from models.bangumi import BangumiInfo, BangumiEpisode, BangumiDailySnapshot
 from models.tag import TagInfo
 from models.user import UserFavorite
 
-# 复用 api.py 中进程内的采集状态与后台线程函数（同一进程共享，保证前后台进度一致）
+# 复用 api.py 中的采集状态读写（数据库持久化，多 worker 共享）与后台线程函数
 from app.routes.api import (
-    _crawl_status,
+    _status_get,
+    _status_set,
     _run_crawl_in_thread,
     _run_refresh_all_in_db_thread,
     _run_sync_subscribed_in_thread,
@@ -56,7 +57,7 @@ def overview():
     snapshot_count = db.session.query(func.count(BangumiDailySnapshot.id)).scalar() or 0
     admin_count = db.session.query(func.count(User.id)).filter(User.is_admin == True).scalar() or 0  # noqa: E712
 
-    status = _crawl_status.get(current_user.id) or {}
+    status = _status_get(current_user.id)
     return jsonify({
         "ok": True,
         "stats": {
@@ -83,7 +84,7 @@ def overview():
 @admin_required
 def crawl_status():
     """管理员最近一次采集进度（与前台 /api/crawl/status 共享同一进程内状态）"""
-    s = _crawl_status.get(current_user.id) or {}
+    s = _status_get(current_user.id)
     return jsonify({
         "ok": True,
         "running": bool(s.get("running")),
@@ -115,7 +116,7 @@ def crawl_start():
     delay = float(data.get("delay") or 3.0)
     delay = max(2.0, min(10.0, delay))
 
-    s = _crawl_status.get(current_user.id)
+    s = _status_get(current_user.id)
     if s and s.get("running"):
         return jsonify({"ok": False, "error": "已有采集任务进行中，请等待结束后再试"}), 409
 
@@ -138,7 +139,7 @@ def crawl_start():
 @admin_required
 def crawl_refresh_in_db():
     """后台依次刷新库内已有番剧的详情"""
-    s = _crawl_status.get(current_user.id)
+    s = _status_get(current_user.id)
     if s and s.get("running"):
         return jsonify({"ok": False, "error": "已有采集任务进行中，请等待结束后再试"}), 409
 
@@ -174,7 +175,7 @@ def crawl_sync_subscribed():
     if not sessdata or not bili_jct:
         return jsonify({"ok": False, "error": "管理员尚未保存 B 站 Cookie，请在个人中心设置"}), 400
 
-    s = _crawl_status.get(current_user.id)
+    s = _status_get(current_user.id)
     if s and s.get("running"):
         return jsonify({"ok": False, "error": "已有采集任务进行中，请等待结束后再试"}), 409
 
