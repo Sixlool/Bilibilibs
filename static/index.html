@@ -379,6 +379,11 @@
         <p class="muted" style="font-size:11px;margin-bottom:8px">页数：拉取多少页列表（每页约 20 条）；间隔：每次请求间隔秒数，建议 3～5。采集完成后请点击顶部「番剧列表」查看；若进度显示共 0 条多为触发风控，可调大间隔或减少页数后重试。</p>
         <div id="crawl-msg" style="font-size:12px;color:#0369a1;min-height:1.2em"></div>
         <hr class="hr-light" style="margin:24px 0">
+        <h3 style="margin-bottom:12px;color:#111827">B站账号绑定</h3>
+        <div id="bili-bind-status" style="font-size:12px;margin-bottom:10px;min-height:1.4em"></div>
+        <p class="muted" style="font-size:12px;margin-bottom:8px">绑定 B 站账号后，可用该 B 站账号扫码直接登录本系统（无需再输账号密码）。</p>
+        <button id="btn-bili-bind-show" type="button" style="margin-bottom:16px">扫码绑定 B 站账号</button>
+        <hr class="hr-light" style="margin:0 0 24px 0">
         <h3 style="margin-bottom:12px;color:#111827">B站 Cookie（可选）</h3>
         <p class="muted" style="font-size:12px;margin-bottom:8px">用于采集时带登录态，降低 412 风控。可手动粘贴 Cookie，或使用下方扫码登录。</p>
         <input type="text" id="bili-sessdata" placeholder="sessdata" style="margin-bottom:8px">

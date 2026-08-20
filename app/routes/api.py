@@ -476,11 +476,16 @@ def get_bilibili_subscribed_bangumi():
 @api_bp.route("/user/bilibili-cookie", methods=["GET"])
 @login_required
 def get_bilibili_cookie_status():
-    """是否已设置 B 站 Cookie（不返回具体值）"""
+    """是否已绑定 B 站账号 / 已设置 B 站 Cookie（不返回 Cookie 具体值，仅返回 UID）"""
     from models.user import User
     u = User.query.get(current_user.id)
     has = bool(u and (u.bilibili_sessdata or "").strip() and (u.bilibili_bili_jct or "").strip())
-    return jsonify({"ok": True, "has_cookie": has})
+    return jsonify({
+        "ok": True,
+        "has_cookie": has,
+        "bilibili_uid": u.bilibili_uid if u else None,
+        "has_bind": bool(u and u.bilibili_uid is not None),
+    })
 
 
 @api_bp.route("/user/bilibili-cookie", methods=["POST"])
@@ -533,12 +538,34 @@ def bilibili_qr_poll():
             if current_user.is_authenticated:
                 u = User.query.get(current_user.id)
                 if u:
+                    # 已登录用户扫码绑定：先检查该 B 站 UID 是否已被其他用户绑定
+                    if bilibili_uid is not None:
+                        try:
+                            bilibili_uid = int(bilibili_uid)
+                        except (TypeError, ValueError):
+                            bilibili_uid = None
+                        if bilibili_uid is not None:
+                            owner = User.query.filter_by(bilibili_uid=bilibili_uid).first()
+                            if owner and owner.id != u.id and not getattr(owner, "is_auto_created", False):
+                                return jsonify({
+                                    "ok": False,
+                                    "status": "error",
+                                    "error": f"该 B 站账号已绑定用户「{owner.username}」，无法重复绑定",
+                                }), 409
+                            if owner and owner.id != u.id and getattr(owner, "is_auto_created", False):
+                                # 接管自动创建账号：收藏迁移 + 删除，UID 归当前用户
+                                from models.user import UserFavorite
+                                favs = UserFavorite.query.filter_by(user_id=owner.id).all()
+                                for f in favs:
+                                    if not UserFavorite.query.filter_by(user_id=u.id, media_id=f.media_id).first():
+                                        f.user_id = u.id
+                                        db.session.add(f)
+                                db.session.delete(owner)
+                            u.bilibili_uid = bilibili_uid
                     u.bilibili_sessdata = sessdata
                     u.bilibili_bili_jct = bili_jct
-                    if bilibili_uid is not None:
-                        u.bilibili_uid = int(bilibili_uid) if isinstance(bilibili_uid, (int, float)) else bilibili_uid
                     db.session.commit()
-                return jsonify({"ok": True, "status": "done", "message": "B 站登录成功，Cookie 已保存"})
+                return jsonify({"ok": True, "status": "done", "message": "B 站登录成功，已绑定账号"})
             # 未登录：扫码成功 → 按 B 站 UID 查找已绑定账号
             # 有绑定 → 直接登录；无绑定 → 返回 bind_token 引导绑定（不自动建号）
             u = None

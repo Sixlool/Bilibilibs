@@ -1120,8 +1120,30 @@ function loadBilibiliCookieStatus() {
     .then(res => {
       const el = document.getElementById("bili-cookie-status");
       if (el) el.textContent = res.has_cookie ? "已设置 B 站 Cookie" : "";
+      // B 站账号绑定状态
+      const bindEl = document.getElementById("bili-bind-status");
+      if (bindEl) {
+        if (res.has_bind && res.bilibili_uid != null) {
+          bindEl.innerHTML = '<span style="color:#16a34a;font-weight:600">✓ 已绑定 B 站账号（UID: ' + res.bilibili_uid + '）</span>';
+        } else if (res.has_cookie) {
+          bindEl.innerHTML = '<span style="color:#b45309">已设置 B 站 Cookie，但尚未绑定 B 站账号 UID。可扫码绑定。</span>';
+        } else {
+          bindEl.innerHTML = '<span style="color:#6b7280">未绑定 B 站账号。扫码绑定后，以后可直接用该 B 站账号扫码登录。</span>';
+        }
+      }
     });
 }
+
+// 个人中心「扫码绑定 B 站账号」按钮 → 复用扫码弹窗
+document.addEventListener("DOMContentLoaded", () => {
+  const bindBtn = document.getElementById("btn-bili-bind-show");
+  if (bindBtn) {
+    bindBtn.addEventListener("click", () => {
+      const showBtn = document.getElementById("btn-bili-qr-show");
+      if (showBtn) showBtn.click();
+    });
+  }
+});
 
 let crawlStatusTimer = null;
 /** 列表页「更新库内番剧信息」提交成功后置 true，进度结束时用于恢复按钮 */
