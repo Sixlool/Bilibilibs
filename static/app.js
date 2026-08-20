@@ -1500,7 +1500,36 @@ function loadSubscribedPage() {
     .then(r => r.json())
     .then(res => {
       if (res.has_bind) {
-        loadBilibiliSubscribed();
+        // 已绑定：自动同步追番入库（去重），完成后从数据库展示
+        const msgEl = document.getElementById("bili-subscribed-msg");
+        const bar = document.getElementById("bili-subscribed-progress-bar") || document.getElementById("crawl-progress-bar");
+        const wrap = document.getElementById("bili-subscribed-progress") || document.getElementById("crawl-progress");
+        if (wrap) wrap.style.display = "block";
+        if (bar) bar.classList.add("indeterminate");
+        if (msgEl) msgEl.textContent = "正在同步追番到数据库…";
+        fetch(`${API_BASE}/crawl/sync-subscribed`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+        })
+          .then(r => r.json())
+          .then(syncRes => {
+            if (syncRes.ok) {
+              // 同步中：轮询进度，完成后加载列表
+              if (msgEl) msgEl.textContent = syncRes.message || "已开始同步，请稍候…";
+              pollSubscribedSync(msgEl);
+            } else {
+              // 未绑定 Cookie 等错误：仍尝试展示已有追番数据
+              if (msgEl) msgEl.textContent = syncRes.error || "同步失败，展示已有数据";
+              if (wrap) wrap.style.display = "none";
+              loadBilibiliSubscribed();
+            }
+          })
+          .catch(() => {
+            if (wrap) wrap.style.display = "none";
+            if (msgEl) msgEl.textContent = "请求失败，展示已有数据";
+            loadBilibiliSubscribed();
+          });
       } else {
         const msgEl = document.getElementById("bili-subscribed-msg");
         const listEl = document.getElementById("bili-subscribed-list");
@@ -1518,6 +1547,34 @@ function loadSubscribedPage() {
       const msgEl = document.getElementById("bili-subscribed-msg");
       if (msgEl) msgEl.textContent = "请求失败，请重试";
     });
+}
+
+// 追番同步进度轮询（复用 /api/crawl/status，job=sync_subscribed）
+let subscribedSyncTimer = null;
+function stopSubscribedSyncPoll() {
+  if (subscribedSyncTimer) { clearInterval(subscribedSyncTimer); subscribedSyncTimer = null; }
+}
+function pollSubscribedSync(msgEl) {
+  stopSubscribedSyncPoll();
+  const wrap = document.getElementById("bili-subscribed-progress") || document.getElementById("crawl-progress");
+  const bar = document.getElementById("bili-subscribed-progress-bar") || document.getElementById("crawl-progress-bar");
+  subscribedSyncTimer = setInterval(() => {
+    fetch(`${API_BASE}/crawl/status`, { credentials: "include" })
+      .then(r => r.json())
+      .then(res => {
+        if (!res.ok) return;
+        if (res.running && res.job === "sync_subscribed") {
+          if (msgEl) msgEl.textContent = res.message || "同步中…";
+          if (bar) { bar.classList.remove("indeterminate"); bar.style.width = (res.pages > 0 ? Math.min(100, Math.round((res.page / res.pages) * 100)) : 30) + "%"; }
+        } else if (!res.running) {
+          stopSubscribedSyncPoll();
+          if (wrap) wrap.style.display = "none";
+          if (msgEl) msgEl.textContent = res.message || "同步完成";
+          loadBilibiliSubscribed();
+        }
+      })
+      .catch(() => {});
+  }, 2000);
 }
 
 // 追番分页状态（独立于番剧列表的全局变量）

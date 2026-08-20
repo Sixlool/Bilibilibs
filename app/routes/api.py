@@ -926,6 +926,10 @@ def crawl_sync_subscribed():
         return jsonify({"ok": False, "error": "请先使用 B 站扫码登录（个人中心 → 显示登录二维码）"}), 400
     if not sessdata or not bili_jct:
         return jsonify({"ok": False, "error": "请先使用 B 站扫码登录以保存 Cookie"}), 400
+    # 并发保护：已有任务运行中则拒绝
+    s = _status_get(current_user.id)
+    if s and s.get("running"):
+        return jsonify({"ok": False, "error": "已有同步任务进行中，请等待结束后再试"}), 409
     app = current_app._get_current_object()
     thread = threading.Thread(
         target=_run_sync_subscribed_in_thread,
