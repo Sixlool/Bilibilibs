@@ -1635,8 +1635,29 @@ function drawBilibiliSubscribedCharts(items) {
 }
 
 function loadSubscribedPage() {
-  // 进入「我的追番」页：确认已登录（未登录跳转由全局初始化处理），加载追番列表
-  loadBilibiliSubscribed();
+  // 进入「我的追番」：先检查是否绑定 B 站账号
+  fetch(`${API_BASE}/user/bilibili-cookie`, { credentials: "include" })
+    .then(r => r.json())
+    .then(res => {
+      if (res.has_bind) {
+        loadBilibiliSubscribed();
+      } else {
+        const msgEl = document.getElementById("bili-subscribed-msg");
+        const listEl = document.getElementById("bili-subscribed-list");
+        const chartsWrap = document.getElementById("bili-subscribed-charts");
+        if (msgEl) {
+          msgEl.innerHTML = '未绑定 B 站账号，请先前往 <a href="#" data-page="user" style="color:#0369a1">个人中心</a> 绑定后再查看追番。';
+          const link = msgEl.querySelector('a[data-page="user"]');
+          if (link) link.addEventListener("click", (e) => { e.preventDefault(); showPage("user"); });
+        }
+        if (listEl) listEl.innerHTML = "";
+        if (chartsWrap) chartsWrap.classList.add("hidden");
+      }
+    })
+    .catch(() => {
+      const msgEl = document.getElementById("bili-subscribed-msg");
+      if (msgEl) msgEl.textContent = "请求失败，请重试";
+    });
 }
 
 function loadBilibiliSubscribed() {
