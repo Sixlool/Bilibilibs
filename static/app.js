@@ -1513,7 +1513,7 @@ function loadSubscribedPage() {
                 const total = listRes.total || 0;
                 const inDb = listRes.in_db_count || 0;
                 const pending = listRes.pending_count || 0;
-                statEl.innerHTML = `共 <b>${total}</b> 部追番，已入库 <b>${inDb}</b> 部，<b style="color:#dc2626">待同步 ${pending} 部</b>${pending > 0 ? '（同步请到 <a href="#" data-page="admin" style="color:#0369a1">后台管理</a>）' : ''}`;
+                statEl.innerHTML = `共 <b>${total}</b> 部追番，已入库 <b>${inDb}</b> 部，<b style="color:#dc2626">${pending} 部已加入待同步队列</b>${pending > 0 ? '（管理员在<a href="#" data-page="admin" style="color:#0369a1">后台管理</a>统一同步）' : ''}`;
                 const adminLink = statEl.querySelector('a[data-page="admin"]');
                 if (adminLink) adminLink.addEventListener("click", (e) => { e.preventDefault(); showPage("admin"); });
               }
@@ -1984,17 +1984,17 @@ function loadAdminPage() {
 function loadAdminSubscribedPending() {
   const btn = document.getElementById("admin-btn-sync-subscribed");
   if (!btn) return;
-  fetch(`${API_BASE}/user/bilibili-subscribed-bangumi`, { credentials: "include" })
+  fetch(`/admin/sync/pending`, { credentials: "include" })
     .then(r => r.json())
     .then(res => {
       if (!res.ok) return;
-      const pending = res.pending_count || 0;
+      const pending = res.queue_count || 0;
       if (pending > 0) {
-        btn.textContent = `同步我的追番（待同步 ${pending} 部）`;
+        btn.textContent = `同步追番队列（${pending} 部待同步）`;
         btn.style.border = "1px solid #dc2626";
         btn.style.color = "#dc2626";
       } else {
-        btn.textContent = "同步我的追番（全部已入库）";
+        btn.textContent = "同步追番队列（空）";
         btn.style.border = "";
         btn.style.color = "";
       }
@@ -2106,7 +2106,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const bar = document.getElementById("admin-crawl-progress-bar");
     document.getElementById("admin-crawl-progress").style.display = "block";
     bar.classList.add("indeterminate");
-    msg.textContent = "正在启动追番同步…";
+    msg.textContent = "正在启动追番队列同步…";
     btnSync.disabled = true;
     fetch(`/admin/crawl/sync-subscribed`, {
       method: "POST",

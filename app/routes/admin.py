@@ -19,7 +19,7 @@ from app.routes.api import (
     _status_set,
     _run_crawl_in_thread,
     _run_refresh_all_in_db_thread,
-    _run_sync_subscribed_in_thread,
+    _run_sync_pending_in_thread,
 )
 
 admin_bp = Blueprint("admin", __name__)
@@ -212,26 +212,54 @@ def crawl_refresh_in_db():
 @admin_bp.route("/crawl/sync-subscribed", methods=["POST"])
 @admin_required
 def crawl_sync_subscribed():
-    """后台同步管理员 B 站追番到本地数据库（需管理员已扫码登录并保存 Cookie）"""
-    uid = getattr(current_user, "bilibili_uid", None)
+    """同步「待同步队列」中的追番入库。
+
+    队列由任意用户查看「我的追番」时自动填充（未入库的追番）。
+    管理员触发本接口：遍历队列逐条采集详情写入 DB（用管理员 Cookie 降低 412 风控），
+    已入库（重复）自动跳过。无需管理员绑定 B 站账号。
+    """
     sessdata, bili_jct = _get_current_user_cookie()
-    if not uid:
-        return jsonify({"ok": False, "error": "管理员尚未绑定 B 站账号，请在个人中心使用 B 站扫码登录"}), 400
-    if not sessdata or not bili_jct:
-        return jsonify({"ok": False, "error": "管理员尚未保存 B 站 Cookie，请在个人中心设置"}), 400
 
     s = _status_get(current_user.id)
     if s and s.get("running"):
         return jsonify({"ok": False, "error": "已有采集任务进行中，请等待结束后再试"}), 409
 
+    from models.user import SubscribedPending
+    pending_count = SubscribedPending.query.filter(
+        SubscribedPending.status.in_([0, 1])).count()
+    if pending_count == 0:
+        return jsonify({"ok": False, "error": "待同步队列为空（用户查看「我的追番」后会自动加入待同步的番剧）"}), 400
+
     app = current_app._get_current_object()
     thread = __import__("threading").Thread(
-        target=_run_sync_subscribed_in_thread,
-        args=(app, current_user.id, sessdata, bili_jct, int(uid)),
+        target=_run_sync_pending_in_thread,
+        args=(app, current_user.id, sessdata, bili_jct),
     )
     thread.daemon = True
     thread.start()
-    return jsonify({"ok": True, "message": "已开始同步追番，请查看下方进度"}), 202
+    return jsonify({"ok": True, "message": f"已开始同步待同步队列（{pending_count} 部），请查看下方进度"}), 202
+
+
+@admin_bp.route("/sync/pending", methods=["GET"])
+@admin_required
+def sync_pending():
+    """管理员查看待同步队列：统计 + 列表"""
+    from models.user import SubscribedPending
+    pending = SubscribedPending.query.filter(
+        SubscribedPending.status.in_([0, 1])).order_by(SubscribedPending.id).all()
+    return jsonify({
+        "ok": True,
+        "queue_count": len(pending),
+        "items": [{
+            "id": p.id,
+            "user_id": p.user_id,
+            "media_id": p.media_id,
+            "season_id": p.season_id,
+            "title": p.title,
+            "cover": p.cover,
+            "status": p.status,
+        } for p in pending],
+    })
 
 
 @admin_bp.route("/users", methods=["GET"])

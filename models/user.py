@@ -71,3 +71,17 @@ class VisitUv(db.Model):
     stat_date = db.Column(db.Date, nullable=False, index=True)
     ip = db.Column(db.String(64), nullable=False, default="")
     __table_args__ = (db.UniqueConstraint("stat_date", "ip", name="uk_date_ip"),)
+
+
+class SubscribedPending(db.Model):
+    """追番待同步队列：用户查看追番时未入库的番剧加入，管理员统一同步"""
+    __tablename__ = "subscribed_pending"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, nullable=False, index=True)
+    media_id = db.Column(db.Integer, nullable=True, index=True)
+    season_id = db.Column(db.Integer, nullable=True)
+    title = db.Column(db.String(256), nullable=False, default="")
+    cover = db.Column(db.String(512), nullable=False, default="")
+    status = db.Column(db.SmallInteger, nullable=False, default=0)  # 0待同步 1同步中 2已同步 3失败
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

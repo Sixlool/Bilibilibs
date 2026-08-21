@@ -476,12 +476,39 @@ def get_bilibili_subscribed_bangumi():
             it["in_db"] = bool(it.get("media_id") in in_db_ids)
             if it["in_db"]:
                 in_db_count += 1
+        # 待同步队列：未入库的追番加入队列（供管理员统一同步），已入库/已在队列的跳过
+        from models.user import SubscribedPending
+        for it in all_list:
+            if it.get("in_db") or not (it.get("media_id") or it.get("season_id")):
+                continue
+            media_id = it.get("media_id")
+            exists = SubscribedPending.query.filter(
+                SubscribedPending.media_id == media_id,
+                SubscribedPending.status.in_([0, 1]),
+            ).first()
+            if exists:
+                continue
+            db.session.add(SubscribedPending(
+                user_id=current_user.id,
+                media_id=media_id,
+                season_id=it.get("season_id"),
+                title=(it.get("title") or "")[:255],
+                cover=(it.get("cover") or "")[:500],
+                status=0,
+            ))
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+        pending_db_count = SubscribedPending.query.filter(
+            SubscribedPending.status.in_([0, 1])).count() if all_list else 0
         return jsonify({
             "ok": True,
             "items": _sanitize_for_json(all_list),
             "total": len(all_list),
             "in_db_count": in_db_count,
             "pending_count": len(all_list) - in_db_count,
+            "queue_count": pending_db_count,
         })
     except Exception as e:
         return jsonify({
@@ -773,6 +800,96 @@ def _run_crawl_in_thread(app, user_id, year, season, pages, page_size, delay, se
                 _status_set(user_id, message=f"写入数据库失败：{e!s}")
             finally:
                 _status_set(user_id, running=False, items=len(details))
+                try:
+                    db.session.remove()
+                except Exception:
+                    pass
+
+
+def _run_sync_pending_in_thread(app, operator_user_id, sessdata, bili_jct):
+    """后台线程：同步「待同步队列」中的追番入库。
+
+    队列由任意用户查看「我的追番」时自动填充（未入库且不在库中的追番）。
+    管理员触发同步时，遍历队列逐条采集详情写入 DB（用管理员 Cookie 降低风控），
+    已入库（重复）的自动跳过；完成后清理已处理项。
+    """
+    import logging
+    import time
+    log = logging.getLogger(__name__)
+    with app.app_context():
+        with app.test_request_context():
+            from models import db
+            from models.user import SubscribedPending
+            from models.bangumi import BangumiInfo
+            from crawler.collector import run_async, _fetch_one_bangumi_detail
+            from services.bangumi_service import save_bangumi_list_safe
+
+            credential = None
+            if sessdata and bili_jct:
+                try:
+                    from bilibili_api.utils.network import Credential
+                    credential = Credential(sessdata=sessdata, bili_jct=bili_jct)
+                except Exception:
+                    pass
+
+            pending = SubscribedPending.query.filter(
+                SubscribedPending.status.in_([0, 1])).order_by(SubscribedPending.id).all()
+            total = len(pending)
+            _status_set(operator_user_id, running=True, job="sync_subscribed",
+                        detail_media_id=None, page=0, pages=max(1, total) if total else 1,
+                        items=0, message=f"待同步队列共 {total} 部追番，开始同步…")
+
+            ok = 0
+            skip = 0
+            fail = 0
+            try:
+                for i, p in enumerate(pending):
+                    # 库内已有（重复）→ 跳过并清除队列项
+                    if p.media_id and BangumiInfo.query.filter_by(media_id=p.media_id).first():
+                        skip += 1
+                        p.status = 2
+                        db.session.commit()
+                        continue
+                    p.status = 1
+                    db.session.commit()
+                    _status_set(operator_user_id, page=i + 1, items=ok + skip + fail,
+                                message=f"同步中 {i + 1}/{total}：{(p.title or '')[:28]}")
+                    try:
+                        detail = None
+                        if p.season_id or p.media_id:
+                            detail = run_async(_fetch_one_bangumi_detail(
+                                p.season_id or 0, p.media_id or 0, credential))
+                        if detail:
+                            detail["media_id"] = detail.get("media_id") or p.media_id
+                            if not (detail.get("cover") or "").strip() and p.cover:
+                                detail["cover"] = p.cover
+                            if not (detail.get("tags") or []):
+                                detail["tags"] = []
+                            save_bangumi_list_safe(db, [detail])
+                            ok += 1
+                            p.status = 2
+                        else:
+                            fail += 1
+                            p.status = 3
+                        db.session.commit()
+                    except Exception as e:
+                        log.warning("队列同步单条失败 media_id=%s: %s", p.media_id, e)
+                        fail += 1
+                        p.status = 3
+                        db.session.commit()
+                    if i + 1 < total:
+                        time.sleep(2)
+            except Exception as e:
+                log.exception("待同步队列同步中断")
+                _status_set(operator_user_id, message=f"队列同步中断：{e!s}")
+            finally:
+                # 清理已处理项（status=2/3）
+                SubscribedPending.query.filter(SubscribedPending.status.in_([2, 3])).delete()
+                db.session.commit()
+                remain = SubscribedPending.query.filter(SubscribedPending.status.in_([0, 1])).count()
+                _status_set(operator_user_id, running=False, job="",
+                            pages=total if total else 1, page=total if total else 0,
+                            message=f"队列同步完成：入库 {ok} 部、跳过重复 {skip} 部、失败 {fail} 部，队列剩余 {remain} 部")
                 try:
                     db.session.remove()
                 except Exception:
