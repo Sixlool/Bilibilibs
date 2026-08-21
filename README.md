@@ -101,7 +101,9 @@ docker compose up -d --build
 ```
 
 - 数据库通过 `init_db.sql` + `migrate_add_admin.sql` 自动初始化
-- HTTPS：证书放入 `deploy/certs/`（fullchain.pem / privkey.pem），按 `deploy/nginx.conf` 注释开启 443
+- **HTTPS 证书**（任选其一）：
+  - 自动签发：Caddy 配置 `sxklzyb.cn { tls { ca https://acme.zerossl.com/v2/DV90 } }`（需服务器能访问 ACME 服务）
+  - 手动证书：阿里云等签发的证书放入 `/etc/caddy/certs/`（fullchain.pem + privkey.key），Caddy 配置 `tls /etc/caddy/certs/xxx.pem /etc/caddy/certs/xxx.key`
 - 传统部署（gunicorn + systemd）：见 `run.py` 头部注释与 `deploy/` 目录
 - 命令行采集：`python run_crawler.py --year 2024 --pages 2 --delay 5`
 
