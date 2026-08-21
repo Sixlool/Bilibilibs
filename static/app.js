@@ -1039,40 +1039,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (showBtn) showBtn.click();
     });
   }
-  // 「我的追番」页：开始同步入库（手动触发）
-  const syncBtn = document.getElementById("btn-subscribed-sync");
-  if (syncBtn) {
-    syncBtn.addEventListener("click", () => {
-      const msgEl = document.getElementById("bili-subscribed-msg");
-      const bar = document.getElementById("bili-subscribed-progress-bar") || document.getElementById("crawl-progress-bar");
-      const wrap = document.getElementById("bili-subscribed-progress") || document.getElementById("crawl-progress");
-      if (wrap) wrap.style.display = "block";
-      if (bar) bar.classList.add("indeterminate");
-      if (msgEl) msgEl.textContent = "正在启动同步…";
-      syncBtn.disabled = true;
-      fetch(`${API_BASE}/crawl/sync-subscribed`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      })
-        .then(r => r.json())
-        .then(res => {
-          if (res.ok) {
-            if (msgEl) msgEl.textContent = res.message || "已开始同步，请稍候…";
-            pollSubscribedSync(msgEl, () => { syncBtn.disabled = false; });
-          } else {
-            if (msgEl) msgEl.textContent = res.error || "同步失败";
-            if (wrap) wrap.style.display = "none";
-            syncBtn.disabled = false;
-          }
-        })
-        .catch(() => {
-          if (msgEl) msgEl.textContent = "请求失败";
-          if (wrap) wrap.style.display = "none";
-          syncBtn.disabled = false;
-        });
-    });
-  }
 });
 
 let crawlStatusTimer = null;
@@ -1547,7 +1513,9 @@ function loadSubscribedPage() {
                 const total = listRes.total || 0;
                 const inDb = listRes.in_db_count || 0;
                 const pending = listRes.pending_count || 0;
-                statEl.innerHTML = `共 <b>${total}</b> 部追番，已入库 <b>${inDb}</b> 部，<b style="color:#dc2626">待同步 ${pending} 部</b>`;
+                statEl.innerHTML = `共 <b>${total}</b> 部追番，已入库 <b>${inDb}</b> 部，<b style="color:#dc2626">待同步 ${pending} 部</b>${pending > 0 ? '（同步请到 <a href="#" data-page="admin" style="color:#0369a1">后台管理</a>）' : ''}`;
+                const adminLink = statEl.querySelector('a[data-page="admin"]');
+                if (adminLink) adminLink.addEventListener("click", (e) => { e.preventDefault(); showPage("admin"); });
               }
               if (msgEl) msgEl.textContent = "";
               // 展示追番列表（含分页），已入库的标记
@@ -1913,6 +1881,7 @@ function adminPollCrawlStatus(msgEl) {
           document.getElementById("admin-btn-refresh-db").disabled = false;
           document.getElementById("admin-btn-sync-subscribed").disabled = false;
           loadAdminOverview();
+          loadAdminSubscribedPending();
         }
       })
       .catch(() => {});
@@ -2007,6 +1976,30 @@ function loadAdminPage() {
   loadAdminVisits();
   // 后台 Cookie 管理：显示当前状态（同个人中心的绑定状态检查复用）
   loadBilibiliCookieStatus();
+  // 同步追番按钮：显示待同步数量
+  loadAdminSubscribedPending();
+}
+
+/** 后台「同步我的追番」：显示当前待同步数量 */
+function loadAdminSubscribedPending() {
+  const btn = document.getElementById("admin-btn-sync-subscribed");
+  if (!btn) return;
+  fetch(`${API_BASE}/user/bilibili-subscribed-bangumi`, { credentials: "include" })
+    .then(r => r.json())
+    .then(res => {
+      if (!res.ok) return;
+      const pending = res.pending_count || 0;
+      if (pending > 0) {
+        btn.textContent = `同步我的追番（待同步 ${pending} 部）`;
+        btn.style.border = "1px solid #dc2626";
+        btn.style.color = "#dc2626";
+      } else {
+        btn.textContent = "同步我的追番（全部已入库）";
+        btn.style.border = "";
+        btn.style.color = "";
+      }
+    })
+    .catch(() => {});
 }
 
 let adminVisitChart = null;
