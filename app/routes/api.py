@@ -464,7 +464,25 @@ def get_bilibili_subscribed_bangumi():
             if len(lst) < ps:
                 break
             pn += 1
-        return jsonify({"ok": True, "items": _sanitize_for_json(all_list)})
+        # 对比库内已入库番剧：标记每部是否已在数据库，并统计待同步数量
+        from models.bangumi import BangumiInfo
+        media_ids = [it["media_id"] for it in all_list if it.get("media_id")]
+        in_db_ids = set()
+        if media_ids:
+            in_db_ids = {m[0] for m in db.session.query(BangumiInfo.media_id)
+                         .filter(BangumiInfo.media_id.in_(media_ids)).all()}
+        in_db_count = 0
+        for it in all_list:
+            it["in_db"] = bool(it.get("media_id") in in_db_ids)
+            if it["in_db"]:
+                in_db_count += 1
+        return jsonify({
+            "ok": True,
+            "items": _sanitize_for_json(all_list),
+            "total": len(all_list),
+            "in_db_count": in_db_count,
+            "pending_count": len(all_list) - in_db_count,
+        })
     except Exception as e:
         return jsonify({
             "ok": False,

@@ -1039,6 +1039,40 @@ document.addEventListener("DOMContentLoaded", () => {
       if (showBtn) showBtn.click();
     });
   }
+  // 「我的追番」页：开始同步入库（手动触发）
+  const syncBtn = document.getElementById("btn-subscribed-sync");
+  if (syncBtn) {
+    syncBtn.addEventListener("click", () => {
+      const msgEl = document.getElementById("bili-subscribed-msg");
+      const bar = document.getElementById("bili-subscribed-progress-bar") || document.getElementById("crawl-progress-bar");
+      const wrap = document.getElementById("bili-subscribed-progress") || document.getElementById("crawl-progress");
+      if (wrap) wrap.style.display = "block";
+      if (bar) bar.classList.add("indeterminate");
+      if (msgEl) msgEl.textContent = "正在启动同步…";
+      syncBtn.disabled = true;
+      fetch(`${API_BASE}/crawl/sync-subscribed`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      })
+        .then(r => r.json())
+        .then(res => {
+          if (res.ok) {
+            if (msgEl) msgEl.textContent = res.message || "已开始同步，请稍候…";
+            pollSubscribedSync(msgEl, () => { syncBtn.disabled = false; });
+          } else {
+            if (msgEl) msgEl.textContent = res.error || "同步失败";
+            if (wrap) wrap.style.display = "none";
+            syncBtn.disabled = false;
+          }
+        })
+        .catch(() => {
+          if (msgEl) msgEl.textContent = "请求失败";
+          if (wrap) wrap.style.display = "none";
+          syncBtn.disabled = false;
+        });
+    });
+  }
 });
 
 let crawlStatusTimer = null;
@@ -1494,45 +1528,46 @@ function drawBilibiliSubscribedCharts(items) {
 }
 
 function loadSubscribedPage() {
-  // 进入「我的追番」：先检查是否绑定 B 站账号
+  // 进入「我的追番」：检查绑定状态；已绑定则拉取追番列表展示（不自动同步，手动触发）
   fetch(`${API_BASE}/user/bilibili-cookie`, { credentials: "include" })
     .then(r => r.json())
     .then(res => {
       if (res.has_bind) {
-        // 已绑定：自动同步追番入库（去重），完成后从数据库展示
+        // 已绑定：拉取追番列表（展示待同步统计 + 列表，不自动入库）
         const msgEl = document.getElementById("bili-subscribed-msg");
-        const bar = document.getElementById("bili-subscribed-progress-bar") || document.getElementById("crawl-progress-bar");
-        const wrap = document.getElementById("bili-subscribed-progress") || document.getElementById("crawl-progress");
-        if (wrap) wrap.style.display = "block";
-        if (bar) bar.classList.add("indeterminate");
-        if (msgEl) msgEl.textContent = "正在同步追番到数据库…";
-        fetch(`${API_BASE}/crawl/sync-subscribed`, {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-        })
+        const syncBar = document.getElementById("bili-subscribed-syncbar");
+        if (msgEl) msgEl.textContent = "正在获取追番列表…";
+        fetch(`${API_BASE}/user/bilibili-subscribed-bangumi`, { credentials: "include" })
           .then(r => r.json())
-          .then(syncRes => {
-            if (syncRes.ok) {
-              // 同步中：轮询进度，完成后加载列表
-              if (msgEl) msgEl.textContent = syncRes.message || "已开始同步，请稍候…";
-              pollSubscribedSync(msgEl);
+          .then(listRes => {
+            if (listRes.ok) {
+              const statEl = document.getElementById("bili-subscribed-stat");
+              if (syncBar) syncBar.classList.remove("hidden");
+              if (statEl) {
+                const total = listRes.total || 0;
+                const inDb = listRes.in_db_count || 0;
+                const pending = listRes.pending_count || 0;
+                statEl.innerHTML = `共 <b>${total}</b> 部追番，已入库 <b>${inDb}</b> 部，<b style="color:#dc2626">待同步 ${pending} 部</b>`;
+              }
+              if (msgEl) msgEl.textContent = "";
+              // 展示追番列表（含分页），已入库的标记
+              showSubscribedList(listRes.items || []);
+              drawBilibiliSubscribedCharts(listRes.items || []);
             } else {
-              // 未绑定 Cookie 等错误：仍尝试展示已有追番数据
-              if (msgEl) msgEl.textContent = syncRes.error || "同步失败，展示已有数据";
-              if (wrap) wrap.style.display = "none";
-              loadBilibiliSubscribed();
+              if (msgEl) msgEl.textContent = listRes.error || "获取追番列表失败";
+              if (syncBar) syncBar.classList.add("hidden");
             }
           })
           .catch(() => {
-            if (wrap) wrap.style.display = "none";
-            if (msgEl) msgEl.textContent = "请求失败，展示已有数据";
-            loadBilibiliSubscribed();
+            if (msgEl) msgEl.textContent = "获取追番列表失败，请重试";
+            if (syncBar) syncBar.classList.add("hidden");
           });
       } else {
         const msgEl = document.getElementById("bili-subscribed-msg");
         const listEl = document.getElementById("bili-subscribed-list");
         const chartsWrap = document.getElementById("bili-subscribed-charts");
+        const syncBar = document.getElementById("bili-subscribed-syncbar");
+        if (syncBar) syncBar.classList.add("hidden");
         if (msgEl) {
           msgEl.innerHTML = '未绑定 B 站账号，请先前往 <a href="#" data-page="user" style="color:#0369a1">个人中心</a> 绑定后再查看追番。';
           const link = msgEl.querySelector('a[data-page="user"]');
@@ -1548,12 +1583,102 @@ function loadSubscribedPage() {
     });
 }
 
+/** 展示追番列表（含分页与已入库标记） */
+function showSubscribedList(items) {
+  subAllItems = items;
+  subPage = 1;
+  const listEl = document.getElementById("bili-subscribed-list");
+  const pagEl = document.getElementById("bili-subscribed-pagination");
+  if (!listEl) return;
+  const total = subAllItems.length;
+  const totalPages = Math.max(1, Math.ceil(total / subPageSize));
+  const start = (subPage - 1) * subPageSize;
+  const pageItems = subAllItems.slice(start, start + subPageSize);
+  if (!pageItems.length) {
+    listEl.innerHTML = "<p style='color:#1f2937'>暂无追番，或请先使用 B 站扫码登录</p>";
+  } else {
+    listEl.innerHTML = pageItems.map(item => {
+      const href = item.media_id ? `https://www.bilibili.com/bangumi/media/md${item.media_id}` : `https://www.bilibili.com/bangumi/play/ss${item.season_id || ''}`;
+      const dbBadge = item.in_db
+        ? '<span style="font-size:10px;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:999px;margin-left:6px">已入库</span>'
+        : '<span style="font-size:10px;background:#fee2e2;color:#b91c1c;padding:1px 6px;border-radius:999px;margin-left:6px">待同步</span>';
+      return `
+        <a class="card" href="${href}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">
+          <img src="${normalizeCoverUrl(item.cover) || ''}" alt="${escapeHtml(item.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 fill=%22%23374151%22 text-anchor=%22middle%22>无图</text></svg>'">
+          <div class="card-body">
+            <div class="card-title">${escapeHtml(item.title)}${dbBadge}</div>
+            <div class="card-meta">播放 ${formatNum(item.play_count)} · 追番 ${formatNum(item.follow_count)}${item.new_ep_index ? " · " + escapeHtml(item.new_ep_index) : ""}</div>
+          </div>
+        </a>`;
+    }).join("");
+  }
+  if (pagEl) {
+    if (totalPages <= 1) {
+      pagEl.innerHTML = "";
+    } else {
+      pagEl.innerHTML = `
+        <button ${subPage <= 1 ? "disabled" : ""} data-subpage="${subPage - 1}">上一页</button>
+        <span style="align-self:center">第 ${subPage} / ${totalPages} 页，共 ${total} 条</span>
+        <button ${subPage >= totalPages ? "disabled" : ""} data-subpage="${subPage + 1}">下一页</button>
+      `;
+      pagEl.querySelectorAll("button[data-subpage]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          subPage = parseInt(btn.dataset.subpage, 10);
+          showSubscribedPageItems();
+          const sec = document.getElementById("page-subscribed");
+          if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+  }
+}
+
+/** 分页翻页（只重渲染当前页） */
+function showSubscribedPageItems() {
+  const listEl = document.getElementById("bili-subscribed-list");
+  if (!listEl) return;
+  const total = subAllItems.length;
+  const totalPages = Math.max(1, Math.ceil(total / subPageSize));
+  if (subPage > totalPages) subPage = totalPages;
+  const start = (subPage - 1) * subPageSize;
+  const pageItems = subAllItems.slice(start, start + subPageSize);
+  listEl.innerHTML = pageItems.map(item => {
+    const href = item.media_id ? `https://www.bilibili.com/bangumi/media/md${item.media_id}` : `https://www.bilibili.com/bangumi/play/ss${item.season_id || ''}`;
+    const dbBadge = item.in_db
+      ? '<span style="font-size:10px;background:#dcfce7;color:#166534;padding:1px 6px;border-radius:999px;margin-left:6px">已入库</span>'
+      : '<span style="font-size:10px;background:#fee2e2;color:#b91c1c;padding:1px 6px;border-radius:999px;margin-left:6px">待同步</span>';
+    return `
+      <a class="card" href="${href}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;display:block">
+        <img src="${normalizeCoverUrl(item.cover) || ''}" alt="${escapeHtml(item.title)}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect fill=%22%23e5e7eb%22 width=%22100%22 height=%22100%22/><text x=%2250%22 y=%2255%22 fill=%22%23374151%22 text-anchor=%22middle%22>无图</text></svg>'">
+        <div class="card-body">
+          <div class="card-title">${escapeHtml(item.title)}${dbBadge}</div>
+          <div class="card-meta">播放 ${formatNum(item.play_count)} · 追番 ${formatNum(item.follow_count)}${item.new_ep_index ? " · " + escapeHtml(item.new_ep_index) : ""}</div>
+        </div>
+      </a>`;
+  }).join("");
+  const pagEl = document.getElementById("bili-subscribed-pagination");
+  if (pagEl) {
+    const totalPages2 = Math.max(1, Math.ceil(subAllItems.length / subPageSize));
+    pagEl.innerHTML = `
+      <button ${subPage <= 1 ? "disabled" : ""} data-subpage="${subPage - 1}">上一页</button>
+      <span style="align-self:center">第 ${subPage} / ${totalPages2} 页，共 ${subAllItems.length} 条</span>
+      <button ${subPage >= totalPages2 ? "disabled" : ""} data-subpage="${subPage + 1}">下一页</button>
+    `;
+    pagEl.querySelectorAll("button[data-subpage]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        subPage = parseInt(btn.dataset.subpage, 10);
+        showSubscribedPageItems();
+      });
+    });
+  }
+}
+
 // 追番同步进度轮询（复用 /api/crawl/status，job=sync_subscribed）
 let subscribedSyncTimer = null;
 function stopSubscribedSyncPoll() {
   if (subscribedSyncTimer) { clearInterval(subscribedSyncTimer); subscribedSyncTimer = null; }
 }
-function pollSubscribedSync(msgEl) {
+function pollSubscribedSync(msgEl, onDone) {
   stopSubscribedSyncPoll();
   const wrap = document.getElementById("bili-subscribed-progress") || document.getElementById("crawl-progress");
   const bar = document.getElementById("bili-subscribed-progress-bar") || document.getElementById("crawl-progress-bar");
@@ -1569,7 +1694,9 @@ function pollSubscribedSync(msgEl) {
           stopSubscribedSyncPoll();
           if (wrap) wrap.style.display = "none";
           if (msgEl) msgEl.textContent = res.message || "同步完成";
-          loadBilibiliSubscribed();
+          if (onDone) onDone();
+          // 完成后刷新列表（重新拉取，更新已入库/待同步统计）
+          loadSubscribedPage();
         }
       })
       .catch(() => {});
