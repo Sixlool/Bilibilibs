@@ -644,12 +644,25 @@ def _consume_bind_token(token):
 
 
 def _status_get(user_id):
-    """读取采集进度（数据库）；无记录返回空 dict"""
+    """读取采集进度（数据库）；无记录返回空 dict。
+    僵尸检测：若 running=True 但超过 ZOMBIE_TIMEOUT 秒未更新（线程被杀/进程重启
+    导致 running 未清理），自动重置为 running=False 并标记中断，避免前端永久卡在"运行中"。"""
+    from datetime import datetime, timedelta
     from models.user import CrawlStatus
     try:
         s = CrawlStatus.query.filter_by(user_id=user_id).first()
         if s is None:
             return {}
+        # 僵尸检测
+        if s.running and s.updated_at is not None:
+            stale_seconds = (datetime.utcnow() - s.updated_at).total_seconds()
+            if stale_seconds > 900:  # 15 分钟无更新 = 任务僵死
+                s.running = False
+                s.message = (s.message or "") + "｜任务已中断（长时间无响应），可重新触发"
+                try:
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
         return {
             "running": bool(s.running),
             "job": s.job or "",
