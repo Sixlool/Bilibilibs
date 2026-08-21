@@ -6,6 +6,17 @@
 const API_BASE = "/api";
 const AUTH_BASE = "/auth";
 
+/**
+ * 获取或复用 ECharts 实例：已有实例直接返回（不重建），首次调用才 init。
+ * 大幅提升重复进入页面/图表时的加载速度（避免每次 dispose→init 的 300ms+ 开销）。
+ */
+function ensureChart(el, theme) {
+  if (!el) return null;
+  let inst = echarts.getInstanceByDom(el);
+  if (!inst) inst = echarts.init(el, theme || null);
+  return inst;
+}
+
 /** 浅色图表主题：打印（含黑白）时对比更清晰 */
 const CHART_THEME = {
   bg: "#ffffff",
@@ -331,12 +342,7 @@ const DASHBOARD_EXTRA_CHART_IDS = [
 
 function renderDashboardExtraCharts(ex) {
   const exData = ex || {};
-  DASHBOARD_EXTRA_CHART_IDS.forEach((cid) => {
-    const el = document.getElementById(cid);
-    if (!el) return;
-    const inst = echarts.getInstanceByDom(el);
-    if (inst) inst.dispose();
-  });
+  // 复用已有实例（不 dispose 重建），提升重复进入速度
 
   const scoreBins = exData.score_bins || [];
   const scatter = exData.scatter || [];
@@ -351,7 +357,7 @@ function renderDashboardExtraCharts(ex) {
 
   const elScore = document.getElementById("chart-score-hist");
   if (elScore) {
-    const ch = echarts.init(elScore);
+    const ch = ensureChart(elScore);
     ch.setOption({
       backgroundColor: CHART_THEME.bg,
       textStyle: { color: CHART_THEME.text },
@@ -395,7 +401,7 @@ function renderDashboardExtraCharts(ex) {
 
   const elScat = document.getElementById("chart-play-score-scatter");
   if (elScat) {
-    const ch = echarts.init(elScat);
+    const ch = ensureChart(elScat);
     const pts = scatter.map(s => ({
       value: [s.play_count, s.score, s.score_count || 0],
       name: s.title || "",
@@ -469,7 +475,7 @@ function renderDashboardExtraCharts(ex) {
 
   const elArea = document.getElementById("chart-area-top");
   if (elArea) {
-    const ch = echarts.init(elArea);
+    const ch = ensureChart(elArea);
     const labels = areaTop.map(a => a.name);
     const vals = areaTop.map(a => a.value);
     ch.setOption({
@@ -507,7 +513,7 @@ function renderDashboardExtraCharts(ex) {
 
   const elRad = document.getElementById("chart-engagement-radar");
   if (elRad) {
-    const ch = echarts.init(elRad);
+    const ch = ensureChart(elRad);
     const labels = tagAvgPlayRank.map((x) => x.name);
     const avgs = tagAvgPlayRank.map((x) => Math.max(0, Number(x.avg_play) || 0));
     ch.setOption({
@@ -593,7 +599,7 @@ function renderDashboardExtraCharts(ex) {
 
   const elSer = document.getElementById("chart-series-hist");
   if (elSer) {
-    const ch = echarts.init(elSer);
+    const ch = ensureChart(elSer);
     ch.setOption({
       backgroundColor: CHART_THEME.bg,
       textStyle: { color: CHART_THEME.text },
@@ -636,7 +642,7 @@ function renderDashboardExtraCharts(ex) {
 
   const elHm = document.getElementById("chart-pub-heatmap");
   if (elHm) {
-    const ch = echarts.init(elHm);
+    const ch = ensureChart(elHm);
     let vmax = 0;
     pubHeat.forEach((cell) => { if (cell[2] > vmax) vmax = cell[2]; });
     ch.setOption({
@@ -679,7 +685,7 @@ function renderDashboardExtraCharts(ex) {
 
   const elSnap = document.getElementById("chart-snapshot-trend");
   if (elSnap) {
-    const ch = echarts.init(elSnap);
+    const ch = ensureChart(elSnap);
     let opt;
     if (snapLines.length > 0) {
       const dateSet = new Set();
@@ -788,15 +794,8 @@ function loadDashboard() {
       hintEl.textContent = "年度/季度趋势仅反映本系统库内已采集的数据，数据量越大、覆盖年份与季度越全，图越有参考价值。当前库内共 " + totalInDb + " 条番剧，其中 " + totalWithDate + " 条有开播日期参与趋势统计。若想提高准确性，建议：在「个人中心」页上方使用「爬取数据」多选几年与季度、增加页数，或使用个人中心「同步追番到本地」补充数据。交互提示：点击「年度」折线上的点按该年筛选列表；点击「季度」柱子按年+季筛选；点击「标签」扇区按标签筛选；点击「播放量」柱子进入该番详情。下方扩展图中：评分柱、地区条、话数柱可联动番剧列表；播放量–评分散点与快照折线点击可进入该番详情。";
     }
 
-    ["chart-year", "chart-season", "chart-tag", "chart-rank", ...DASHBOARD_EXTRA_CHART_IDS].forEach((cid) => {
-      const el = document.getElementById(cid);
-      if (!el) return;
-      const inst = echarts.getInstanceByDom(el);
-      if (inst) inst.dispose();
-    });
-
     const chartYearEl = document.getElementById("chart-year");
-    const chartYear = echarts.init(chartYearEl);
+    const chartYear = ensureChart(chartYearEl);
     chartYear.setOption({
       backgroundColor: CHART_THEME.bg,
       textStyle: { color: CHART_THEME.text },
@@ -847,7 +846,7 @@ function loadDashboard() {
     setTimeout(() => chartYear.resize(), 100);
 
     const chartSeasonEl = document.getElementById("chart-season");
-    const chartSeason = echarts.init(chartSeasonEl);
+    const chartSeason = ensureChart(chartSeasonEl);
     chartSeason.setOption({
       backgroundColor: CHART_THEME.bg,
       textStyle: { color: CHART_THEME.text },
@@ -885,7 +884,7 @@ function loadDashboard() {
     setTimeout(() => chartSeason.resize(), 100);
 
     const chartTagEl = document.getElementById("chart-tag");
-    const chartTag = echarts.init(chartTagEl);
+    const chartTag = ensureChart(chartTagEl);
     chartTag.setOption({
       backgroundColor: CHART_THEME.bg,
       textStyle: { color: CHART_THEME.text },
@@ -909,7 +908,7 @@ function loadDashboard() {
     setTimeout(() => chartTag.resize(), 100);
 
     const chartRankEl = document.getElementById("chart-rank");
-    const chartRank = echarts.init(chartRankEl);
+    const chartRank = ensureChart(chartRankEl);
     chartRank.setOption({
       backgroundColor: CHART_THEME.bg,
       textStyle: { color: CHART_THEME.text },
@@ -967,7 +966,7 @@ function loadDashboard() {
     ["chart-year", "chart-season", "chart-tag", "chart-rank", ...DASHBOARD_EXTRA_CHART_IDS].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
-        const chart = echarts.init(el);
+        const chart = ensureChart(el);
         chart.setOption({
           backgroundColor: CHART_THEME.bg,
           title: { text: "加载失败", left: "center", top: "center", textStyle: { color: "#dc2626" } },
@@ -1345,7 +1344,7 @@ function drawBilibiliSubscribedCharts(items) {
 
   const sorted = items.slice().sort((a, b) => (b.play_count || 0) - (a.play_count || 0));
   const top10 = sorted.slice(0, 10);
-  const rankChart = echarts.init(rankEl);
+  const rankChart = ensureChart(rankEl);
   const xCats = top10.map((x) => {
     const t = (x.title || "").trim() || "—";
     return t.length > 8 ? t.slice(0, 7) + "…" : t;
@@ -1424,7 +1423,7 @@ function drawBilibiliSubscribedCharts(items) {
     statusCount[k] = (statusCount[k] || 0) + 1;
   });
   const statusData = Object.entries(statusCount).map(([name, value]) => ({ name, value }));
-  const statusChart = echarts.init(statusEl);
+  const statusChart = ensureChart(statusEl);
   statusChart.setOption({
     backgroundColor: CHART_THEME.bg,
     textStyle: { color: CHART_THEME.text },
@@ -1456,7 +1455,7 @@ function drawBilibiliSubscribedCharts(items) {
             ? `共 ${requested} 部追番，其中 ${matched} 部已在本系统采集并有标签（仅统计这 ${matched} 部）`
             : "";
         }
-        const tagsChart = echarts.init(tagsEl);
+        const tagsChart = ensureChart(tagsEl);
         tagsChart.setOption({
           backgroundColor: CHART_THEME.bg,
           textStyle: { color: CHART_THEME.text },
@@ -1476,7 +1475,7 @@ function drawBilibiliSubscribedCharts(items) {
       })
       .catch(() => {
         if (hintEl) hintEl.textContent = "";
-        const tagsChart = echarts.init(tagsEl);
+        const tagsChart = ensureChart(tagsEl);
         tagsChart.setOption({
           backgroundColor: CHART_THEME.bg,
           title: { text: "加载失败", left: "center", top: "center", textStyle: { color: CHART_THEME.muted } },
@@ -1484,7 +1483,7 @@ function drawBilibiliSubscribedCharts(items) {
         _biliSubscribedCharts.tags = tagsChart;
       });
   } else {
-    const tagsChart = echarts.init(tagsEl);
+    const tagsChart = ensureChart(tagsEl);
     tagsChart.setOption({
       backgroundColor: CHART_THEME.bg,
       title: { text: "暂无数据", left: "center", top: "center", textStyle: { color: CHART_THEME.muted } },
@@ -1910,7 +1909,7 @@ function loadAdminVisits() {
         return;
       }
       if (adminVisitChart) { adminVisitChart.dispose(); adminVisitChart = null; }
-      adminVisitChart = echarts.init(chartEl);
+      adminVisitChart = ensureChart(chartEl);
       adminVisitChart.setOption({
         tooltip: { trigger: "axis" },
         legend: { data: ["访问量 (PV)", "访客数 (UV)"] },
